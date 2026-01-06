@@ -1,0 +1,9 @@
+audio_files/
+mnt/
+practice_env/
+*.wav
+__pyache__/
+*.pyc
+*.pyco
+*.pyd
+*.pyo
