@@ -68,9 +68,12 @@ check_success "pillow instalado"
 pip install pyrubberband > /dev/null 2>&1
 check_success "pyrubberband instalado"
 
-# gpiozero (si no está ya)
+# gpiozero + backend lgpio
 pip install gpiozero > /dev/null 2>&1
 check_success "gpiozero instalado"
+
+pip install lgpio > /dev/null 2>&1
+check_success "lgpio instalado"
 
 deactivate
 

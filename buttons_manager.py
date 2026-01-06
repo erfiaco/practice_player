@@ -138,12 +138,12 @@ class ButtonsManager:
         Configura callbacks para modo BROWSER
         - GPIO23 (tempo_dn) → Archivo anterior
         - GPIO22 (tempo_up) → Archivo siguiente
-        - GPIO13 TAP → Seleccionar
+        - GPIO5 TAP → Seleccionar
         - GPIO13 HOLD → Salir
         """
         self.set_callback('tempo_down', on_prev)
         self.set_callback('tempo_up', on_next)
-        self.set_callback('stop_tap', on_select)
+        self.set_callback('play', on_select)
         self.set_callback('stop_hold', on_exit)
     
     def set_player_mode(self, on_play, on_mark_a_tap, on_mark_a_hold,

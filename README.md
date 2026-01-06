@@ -56,7 +56,7 @@ practice_player/
 ```
 GPIO23 → Archivo anterior
 GPIO22 → Archivo siguiente
-GPIO13 SHORT → Seleccionar archivo (pasar a modo PLAYER)
+GPIO5 SHORT → Seleccionar archivo (pasar a modo PLAYER)
 GPIO13 HOLD (3s) → Salir al boot menu
 ```
 
@@ -77,7 +77,7 @@ GPIO22 → Tempo +1% (o ajustar +0.1s en modo hold)
 ## Flujo de trabajo típico
 
 1. **Navegar** con GPIO23/22 hasta encontrar el archivo deseado
-2. **Seleccionar** con GPIO13 (short press)
+2. **Seleccionar** con GPIO5 (short press)
 3. **Reproducir** con GPIO5
 4. **Marcar punto A** cuando empiece el solo (GPIO26 tap)
 5. **Marcar punto B** cuando termine el solo (GPIO6 tap)
