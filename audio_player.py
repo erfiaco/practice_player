@@ -80,6 +80,9 @@ class AudioPlayer:
         if self.is_playing:
             return
         
+        # ⭐ RESETEAR posición al empezar
+        self.current_position = 0.0
+        
         self.is_playing = True
         self.is_paused = False
         self.stop_event.clear()
@@ -129,6 +132,9 @@ class AudioPlayer:
         # Esperar a que termine el thread
         if self.playback_thread and self.playback_thread.is_alive():
             self.playback_thread.join(timeout=1.0)
+        
+        # ⭐ Resetear posición al detener
+        self.current_position = 0.0
         
         if self.on_state_change:
             self.on_state_change("Detenido")
@@ -313,6 +319,7 @@ class AudioPlayer:
         
         # Reproducir
         self.current_position = start_time
+        playback_start_time = time.perf_counter()  # ⭐ Timestamp de inicio
         sd.play(section, self.samplerate)
         
         # Actualizar posición mientras reproduce
@@ -327,11 +334,12 @@ class AudioPlayer:
                 if not self.stop_event.is_set():
                     remaining_start = int(self.current_position * self.samplerate)
                     remaining_section = self.audio_data[remaining_start:end_sample]
+                    playback_start_time = time.perf_counter()  # ⭐ Reset timestamp
                     sd.play(remaining_section, self.samplerate)
             
-            # Actualizar posición
+            # Actualizar posición usando perf_counter en vez de sd.get_stream().time
             if sd.get_stream().active:
-                elapsed = sd.get_stream().time
+                elapsed = time.perf_counter() - playback_start_time  # ⭐ Calcular elapsed
                 self.current_position = start_time + elapsed
             
             time.sleep(0.05)
