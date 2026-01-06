@@ -80,8 +80,9 @@ class AudioPlayer:
         if self.is_playing:
             return
         
-        # ⭐ RESETEAR posición al empezar
-        self.current_position = 0.0
+        # ⭐ Solo resetear posición si NO estamos resumiendo desde pausa
+        if not self.is_paused:
+            self.current_position = 0.0
         
         self.is_playing = True
         self.is_paused = False
@@ -114,6 +115,13 @@ class AudioPlayer:
         
         self.is_paused = False
         self.pause_event.clear()
+        
+        # ⭐ Si el thread murió, relanzarlo
+        if self.playback_thread is None or not self.playback_thread.is_alive():
+            self.is_playing = True
+            self.stop_event.clear()
+            self.playback_thread = threading.Thread(target=self._playback_worker, daemon=True)
+            self.playback_thread.start()
         
         if self.on_state_change:
             self.on_state_change("Reproduciendo")
@@ -308,8 +316,16 @@ class AudioPlayer:
     
     def _play_section(self, start_time, end_time):
         """Reproduce una sección específica del audio"""
+        # ⭐ Si current_position está entre start_time y end_time, resumir desde ahí
+        # (esto pasa cuando se hace resume después de pause)
+        if start_time < self.current_position < end_time:
+            actual_start = self.current_position
+        else:
+            actual_start = start_time
+            self.current_position = start_time
+        
         # Convertir tiempos a samples
-        start_sample = int(start_time * self.samplerate)
+        start_sample = int(actual_start * self.samplerate)
         end_sample = int(end_time * self.samplerate)
         
         # Extraer sección
@@ -318,9 +334,9 @@ class AudioPlayer:
         # TODO: Aplicar tempo si es necesario
         
         # Reproducir
-        self.current_position = start_time
         playback_start_time = time.perf_counter()  # ⭐ Timestamp de inicio
         sd.play(section, self.samplerate)
+        time.sleep(0.01)  # ⭐ Pequeño delay para que el stream se inicialice
         
         # Actualizar posición mientras reproduce
         while sd.get_stream().active and not self.stop_event.is_set():
@@ -336,11 +352,12 @@ class AudioPlayer:
                     remaining_section = self.audio_data[remaining_start:end_sample]
                     playback_start_time = time.perf_counter()  # ⭐ Reset timestamp
                     sd.play(remaining_section, self.samplerate)
+                    time.sleep(0.01)  # ⭐ Delay para inicialización del stream
             
             # Actualizar posición usando perf_counter en vez de sd.get_stream().time
             if sd.get_stream().active:
                 elapsed = time.perf_counter() - playback_start_time  # ⭐ Calcular elapsed
-                self.current_position = start_time + elapsed
+                self.current_position = actual_start + elapsed
             
             time.sleep(0.05)
         
