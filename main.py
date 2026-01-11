@@ -73,13 +73,13 @@ class PracticePlayer:
     
     # ========== CALLBACKS BROWSER ==========
     
-    def _browser_prev(self):
+    def _browser_prev(self, delta=None):
         """GPIO23: Archivo anterior"""
         print("â†’ [BROWSER] Archivo anterior")
         self.browser.prev_file()
         self._update_ui()
     
-    def _browser_next(self):
+    def _browser_next(self, delta=None):
         """GPIO22: Archivo siguiente"""
         print("â†’ [BROWSER] Archivo siguiente")
         self.browser.next_file()
