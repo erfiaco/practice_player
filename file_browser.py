@@ -19,7 +19,10 @@ class FileBrowser:
         
         # Buscar archivos WAV
         pattern = os.path.join(self.audio_dir, "*.wav")
-        self.files = sorted(glob.glob(pattern))
+        archivos_encontrados = glob.glob(pattern)
+        
+        # Ordenar por fecha de modificación (más reciente primero)
+        self.files = sorted(archivos_encontrados, key=os.path.getmtime, reverse=True)
         
         if not self.files:
             print(f"⚠ No hay archivos WAV en {self.audio_dir}")
