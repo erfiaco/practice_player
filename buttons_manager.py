@@ -17,8 +17,9 @@ class ButtonsManager:
         self.btn_mark_a   = Button(26, pull_up=True, bounce_time=0.03, hold_time=1.0)
         self.btn_mark_b   = Button(6,  pull_up=True, bounce_time=0.03, hold_time=1.0)
         self.btn_stop     = Button(13, pull_up=True, bounce_time=0.03, hold_time=3.0)
-        self.btn_tempo_dn = Button(23, pull_up=True, bounce_time=0.03, hold_time=0.3)
-        self.btn_tempo_up = Button(22, pull_up=True, bounce_time=0.03, hold_time=0.3)
+        self.btn_tempo_dn = Button(300, pull_up=True, bounce_time=0.03, hold_time=0.3)
+        self.btn_tempo_up = Button(200, pull_up=True, bounce_time=0.03, hold_time=0.3)
+        self.btn_save = Button(23, pull_up=True, bounce_time=0.03, hold_time=0.3)
         
         # Callbacks vacÃ­os por defecto
         self._callbacks = {
@@ -32,6 +33,7 @@ class ButtonsManager:
             'stop_hold': None,
             'tempo_down': None,
             'tempo_up': None,
+            'save: None
         }
         
         # Estado para detectar tap vs hold
@@ -260,6 +262,7 @@ class ButtonsManager:
         self.set_callback('stop_hold', on_back)
         self.set_callback('tempo_down', on_tempo_down)
         self.set_callback('tempo_up', on_tempo_up)
+        self.set_callback('save', on_save)
     
     def close(self):
         """Libera recursos GPIO"""
@@ -270,5 +273,6 @@ class ButtonsManager:
             self.btn_stop.close()
             self.btn_tempo_dn.close()
             self.btn_tempo_up.close()
+            self.btn_save.close()
         except:
             pass

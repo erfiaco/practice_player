@@ -14,6 +14,7 @@ from file_browser import FileBrowser
 from audio_player import AudioPlayer
 from buttons_manager import ButtonsManager
 from oled_display import OledDisplay
+from audio_clip import AudioClip
 
 class PracticePlayer:
     def __init__(self):
@@ -25,6 +26,7 @@ class PracticePlayer:
         self.browser = FileBrowser(audio_dir="audio_files")
         self.player = AudioPlayer(on_state_change=self._update_ui)
         self.buttons = ButtonsManager()
+        self.saving = AudioClip()
         
         # Configurar botones segÃºn estado inicial
         self._set_browser_mode()
@@ -65,8 +67,9 @@ class PracticePlayer:
             on_mark_b_hold=self._player_mark_b_hold,
             on_stop=self._player_stop,
             on_back=self._player_back,
-            on_tempo_down=self._player_tempo_down,
-            on_tempo_up=self._player_tempo_up
+            #on_tempo_down=self._player_tempo_down,
+            #on_tempo_up=self._player_tempo_up,
+            on_save=self._player_save
         )
         self._update_ui("Modo PLAYER")
         print("â†’ Modo PLAYER activado")
@@ -195,6 +198,15 @@ class PracticePlayer:
         
         self._update_ui()
     
+    def _player_save(self):
+        """
+        GPIO22: Tempo +1% o ajuste fino con delta variable
+        delta: segundos a ajustar (0.1, 0.5, o 1.0 según tiempo pulsado)
+        """
+        self.player.save_loop:
+            print(f"→ [ PLAYER] saving loop")
+        self._update_ui()   
+        
     # ========== UI ==========
     
     def _update_ui(self, message=""):
