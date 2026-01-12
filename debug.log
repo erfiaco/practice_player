@@ -1,0 +1,23 @@
+Exception in thread Thread-1:
+Traceback (most recent call last):
+  File "/usr/lib/python3.9/threading.py", line 954, in _bootstrap_inner
+    self.run()
+  File "/home/Javo/Proyects/practice_player/practice_env/lib/python3.9/site-packages/lgpio.py", line 557, in run
+    cb.func(chip, gpio, level, tick)
+  File "/home/Javo/Proyects/practice_player/practice_env/lib/python3.9/site-packages/gpiozero/pins/lgpio.py", line 248, in _call_when_changed
+    super()._call_when_changed(ticks / 1000000000, level)
+  File "/home/Javo/Proyects/practice_player/practice_env/lib/python3.9/site-packages/gpiozero/pins/local.py", line 111, in _call_when_changed
+    super()._call_when_changed(
+  File "/home/Javo/Proyects/practice_player/practice_env/lib/python3.9/site-packages/gpiozero/pins/pi.py", line 618, in _call_when_changed
+    method(ticks, state)
+  File "/home/Javo/Proyects/practice_player/practice_env/lib/python3.9/site-packages/gpiozero/input_devices.py", line 179, in _pin_changed
+    self._fire_events(ticks, bool(self._state_to_value(state)))
+  File "/home/Javo/Proyects/practice_player/practice_env/lib/python3.9/site-packages/gpiozero/mixins.py", line 385, in _fire_events
+    self._fire_activated()
+  File "/home/Javo/Proyects/practice_player/practice_env/lib/python3.9/site-packages/gpiozero/mixins.py", line 431, in _fire_activated
+    super()._fire_activated()
+  File "/home/Javo/Proyects/practice_player/practice_env/lib/python3.9/site-packages/gpiozero/mixins.py", line 348, in _fire_activated
+    self.when_activated()
+  File "/home/Javo/Proyects/practice_player/buttons_manager.py", line 166, in _on_tempo_up_press
+    self._callbacks['tempo_up'](0.1)  # Primera pulsaciÃ³n: 0.1s
+TypeError: _browser_next() takes 1 positional argument but 2 were given

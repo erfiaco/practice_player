@@ -383,6 +383,67 @@ class AudioPlayer:
             time.sleep(0.05)
         
         sd.wait()
+
+
+    # ========== GUARDAR LOOP ==========
+
+    def save_loop(self):
+        """
+        Guarda la sección A-B como un nuevo archivo WAV
+        Formato: nombreoriginal_MMSS.wav (donde MMSS es el minuto:segundo del punto A)
+        Retorna: (success, mensaje)
+        """
+        # Verificar que hay loop definido
+        if self.point_a is None or self.point_b is None:
+            return (False, "No hay loop A-B definido")
+
+        if self.audio_data is None or self.filepath is None:
+            return (False, "No hay archivo cargado")
+
+        try:
+            # Extraer nombre base del archivo original (sin path ni extensión)
+            import os
+            basename = os.path.basename(self.filepath)  # ej: "solo_django.wav"
+            name_without_ext = os.path.splitext(basename)[0]  # ej: "solo_django"
+
+            # Calcular minuto y segundo del punto A
+            minutes = int(self.point_a // 60)
+            seconds = int(self.point_a % 60)
+            timestamp = f"{minutes:02d}{seconds:02d}"  # ej: "0205" para 2:05
+
+            # Construir nuevo nombre
+            new_basename = f"{name_without_ext}_{timestamp}.wav"
+
+            # Path completo (misma carpeta que el original)
+            original_dir = os.path.dirname(self.filepath)
+            new_filepath = os.path.join(original_dir, new_basename)
+
+            # Verificar si ya existe
+            if os.path.exists(new_filepath):
+                # Añadir sufijo numérico
+                counter = 1
+                while os.path.exists(new_filepath):
+                    new_basename = f"{name_without_ext}_{timestamp}_{counter}.wav"
+                    new_filepath = os.path.join(original_dir, new_basename)
+                    counter += 1
+
+            # Extraer sección de audio
+            start_sample = int(self.point_a * self.samplerate)
+            end_sample = int(self.point_b * self.samplerate)
+            loop_section = self.audio_data[start_sample:end_sample]
+
+            # Guardar como WAV
+            sf.write(new_filepath, loop_section, self.samplerate)
+
+            duration = (self.point_b - self.point_a)
+            print(f"✓ Loop guardado: {new_basename} ({duration:.1f}s)")
+
+            return (True, f"Guardado: {new_basename}")
+
+        except Exception as e:
+            print(f"Error al guardar loop: {e}")
+            return (False, f"Error: {e}")
+
     
     # ========== GETTERS ==========
     

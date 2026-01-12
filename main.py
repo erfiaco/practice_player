@@ -65,8 +65,9 @@ class PracticePlayer:
             on_mark_b_hold=self._player_mark_b_hold,
             on_stop=self._player_stop,
             on_back=self._player_back,
-            on_tempo_down=self._player_tempo_down,
-            on_tempo_up=self._player_tempo_up
+            #on_tempo_down=self._player_tempo_down,
+            #on_tempo_up=self._player_tempo_up
+            on_save_loop=self._player_save_loop
         )
         self._update_ui("Modo PLAYER")
         print("â†’ Modo PLAYER activado")
@@ -162,38 +163,59 @@ class PracticePlayer:
         print("â†’ [PLAYER] Volver a BROWSER")
         self.player.stop()
         self._set_browser_mode()
-    
-    def _player_tempo_down(self, delta=0.1):
-        """
-        GPIO23: Tempo -1% o ajuste fino con delta variable
-        delta: segundos a ajustar (0.1, 0.5, o 1.0 segÃºn tiempo pulsado)
-        """
-        if self.player.adjusting_point:
-            # En modo ajuste: mover -delta segundos
-            print(f"→ [PLAYER] Ajustar -{delta}s")
-            self.player.adjust_fine(-delta)
+
+    def _player_save_loop(self):
+        """GPIO23 TAP: Guardar sección A-B como archivo WAV"""
+        print("✓ [PLAYER] Guardar loop A-B")
+
+        success, message = self.player.save_loop()
+
+        if success:
+            print(f"✓ {message}")
+            # Mostrar mensaje en display
+            self.display.show_message(message)
+            time.sleep(2)  # Mostrar por 2 segundos
+
+            # Refresh del browser para que aparezca el nuevo archivo
+            self.browser.refresh()
         else:
-            # Normal: tempo -1%
-            print("â†’ [PLAYER] Tempo -1%")
-            self.player.change_tempo(-1)
-        
+            print(f"✗ {message}")
+            self.display.show_message(f"Error: {message}")
+            time.sleep(2)
+
         self._update_ui()
     
-    def _player_tempo_up(self, delta=0.1):
-        """
-        GPIO22: Tempo +1% o ajuste fino con delta variable
-        delta: segundos a ajustar (0.1, 0.5, o 1.0 según tiempo pulsado)
-        """
-        if self.player.adjusting_point:
-            # En modo ajuste: mover +delta segundos
-            print(f"→ [PLAYER] Ajustar +{delta}s")
-            self.player.adjust_fine(+delta)
-        else:
-            # Normal: tempo +1%
-            print("â†’ [PLAYER] Tempo +1%")
-            self.player.change_tempo(+1)
-        
-        self._update_ui()
+#    def _player_tempo_down(self, delta=0.1):
+#        """
+#        GPIO23: Tempo -1% o ajuste fino con delta variable
+#        delta: segundos a ajustar (0.1, 0.5, o 1.0 segÃºn tiempo pulsado)
+#        """
+#        if self.player.adjusting_point:
+#            # En modo ajuste: mover -delta segundos
+#            print(f"→ [PLAYER] Ajustar -{delta}s")
+#            self.player.adjust_fine(-delta)
+#        else:
+#            # Normal: tempo -1%
+#            print("â†’ [PLAYER] Tempo -1%")
+#            self.player.change_tempo(-1)
+#
+#        self._update_ui()
+#
+#    def _player_tempo_up(self, delta=0.1):
+#        """
+#        GPIO22: Tempo +1% o ajuste fino con delta variable
+#        delta: segundos a ajustar (0.1, 0.5, o 1.0 según tiempo pulsado)
+#        """
+#        if self.player.adjusting_point:
+#            # En modo ajuste: mover +delta segundos
+#            print(f"→ [PLAYER] Ajustar +{delta}s")
+#            self.player.adjust_fine(+delta)
+#        else:
+#            # Normal: tempo +1%
+#            print("â†’ [PLAYER] Tempo +1%")
+#            self.player.change_tempo(+1)
+#
+#        self._update_ui()
     
     # ========== UI ==========
     

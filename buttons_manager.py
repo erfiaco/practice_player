@@ -32,6 +32,7 @@ class ButtonsManager:
             'stop_hold': None,
             'tempo_down': None,
             'tempo_up': None,
+            'save_loop': None,  # Nuevo: guardar loop A-B
         }
         
         # Estado para detectar tap vs hold
@@ -40,6 +41,7 @@ class ButtonsManager:
         self._mark_b_held = False
         
         # Estado para botones de tempo (ajuste progresivo)
+        # NOTA: Por ahora deshabilitado, solo usamos GPIO23 para save_loop
         self._tempo_down_held = False
         self._tempo_up_held = False
         self._tempo_hold_start_time = None
@@ -133,87 +135,114 @@ class ButtonsManager:
         if self._callbacks['stop_hold']:
             self._callbacks['stop_hold']()
     
-    # === Tempo (con repeticiÃ³n progresiva) ===
+##    # === Tempo (con repeticiÃ³n progresiva) ===
+    #def _on_tempo_down_press(self):
+        #"""Inicia ajuste hacia abajo con repeticiÃ³n progresiva"""
+        #self._tempo_down_held = True
+        #self._tempo_hold_start_time = time.time()
+        
+        ## Primera llamada inmediata
+        #if self._callbacks['tempo_down']:
+            #self._callbacks['tempo_down'](0.1)  # Primera pulsaciÃ³n: 0.1s
+        
+        ## Iniciar thread de repeticiÃ³n
+        #if self._tempo_repeat_thread is None or not self._tempo_repeat_thread.is_alive():
+            #self._tempo_repeat_thread = threading.Thread(
+                #target=self._tempo_repeat_worker,
+                #args=('down',),
+                #daemon=True
+            #)
+            #self._tempo_repeat_thread.start()
+    
+    #def _on_tempo_down_release(self):
+        #"""Detiene el ajuste hacia abajo"""
+        #self._tempo_down_held = False
+    
+    #def _on_tempo_up_press(self):
+        #"""Inicia ajuste hacia arriba con repeticiÃ³n progresiva"""
+        #self._tempo_up_held = True
+        #self._tempo_hold_start_time = time.time()
+        
+        ## Primera llamada inmediata
+        #if self._callbacks['tempo_up']:
+            #self._callbacks['tempo_up'](0.1)  # Primera pulsaciÃ³n: 0.1s
+        
+        ## Iniciar thread de repeticiÃ³n
+        #if self._tempo_repeat_thread is None or not self._tempo_repeat_thread.is_alive():
+            #self._tempo_repeat_thread = threading.Thread(
+                #target=self._tempo_repeat_worker,
+                #args=('up',),
+                #daemon=True
+            #)
+            #self._tempo_repeat_thread.start()
+    
+    #def _on_tempo_up_release(self):
+        #"""Detiene el ajuste hacia arriba"""
+        #self._tempo_up_held = False
+    
+    #def _tempo_repeat_worker(self, direction):
+        #"""
+        #Worker thread que repite el ajuste mientras el botÃ³n estÃ© pulsado
+        #Delta progresivo:
+        #- 0-1s: 0.1s por pulsaciÃ³n (ajuste fino)
+        #- 1-2s: 0.5s por pulsaciÃ³n (ajuste medio)
+        #- >2s: 1.0s por pulsaciÃ³n (ajuste rÃ¡pido)
+        #"""
+        #time.sleep(0.3)  # Delay inicial antes de empezar a repetir
+        
+        #callback = self._callbacks['tempo_down'] if direction == 'down' else self._callbacks['tempo_up']
+        #is_held = lambda: self._tempo_down_held if direction == 'down' else self._tempo_up_held
+        
+        #if not callback:
+            #return
+        
+        #while is_held():
+            ## Calcular tiempo transcurrido desde que se pulsÃ³
+            #elapsed = time.time() - self._tempo_hold_start_time
+            
+            ## Determinar delta segÃºn tiempo transcurrido
+            #if elapsed < 1.0:
+                #delta = 0.1
+                #repeat_delay = 0.15  # Repetir cada 150ms
+            #elif elapsed < 2.0:
+                #delta = 0.5
+                #repeat_delay = 0.12  # Repetir cada 120ms (mÃ¡s rÃ¡pido)
+            #else:
+                #delta = 1.0
+                #repeat_delay = 0.10  # Repetir cada 100ms (aÃºn mÃ¡s rÃ¡pido)
+            
+            ## Llamar al callback con el delta apropiado
+            #callback(delta)
+            
+            ## Esperar antes de la siguiente repeticiÃ³n
+            #time.sleep(repeat_delay)
+
+    # === GPIO23/22 Simplificados ===
     def _on_tempo_down_press(self):
-        """Inicia ajuste hacia abajo con repeticiÃ³n progresiva"""
-        self._tempo_down_held = True
-        self._tempo_hold_start_time = time.time()
-        
-        # Primera llamada inmediata
-        if self._callbacks['tempo_down']:
-            self._callbacks['tempo_down'](0.1)  # Primera pulsaciÃ³n: 0.1s
-        
-        # Iniciar thread de repeticiÃ³n
-        if self._tempo_repeat_thread is None or not self._tempo_repeat_thread.is_alive():
-            self._tempo_repeat_thread = threading.Thread(
-                target=self._tempo_repeat_worker, 
-                args=('down',),
-                daemon=True
-            )
-            self._tempo_repeat_thread.start()
-    
+        """GPIO23 TAP: Guardar loop (en modo player) o navegar (en modo browser)"""
+        # En modo player: guardar loop
+        if self._callbacks['save_loop']:
+            self._callbacks['save_loop']()
+        # En modo browser: navegar (si está configurado)
+        elif self._callbacks['tempo_down']:
+            self._callbacks['tempo_down'](0.1)
+
     def _on_tempo_down_release(self):
-        """Detiene el ajuste hacia abajo"""
-        self._tempo_down_held = False
-    
+        """GPIO23 release - no hace nada en modo simple"""
+        pass
+
     def _on_tempo_up_press(self):
-        """Inicia ajuste hacia arriba con repeticiÃ³n progresiva"""
-        self._tempo_up_held = True
-        self._tempo_hold_start_time = time.time()
-        
-        # Primera llamada inmediata
+        """GPIO22 TAP: Por ahora sin uso (reservado para futuro)"""
         if self._callbacks['tempo_up']:
-            self._callbacks['tempo_up'](0.1)  # Primera pulsaciÃ³n: 0.1s
-        
-        # Iniciar thread de repeticiÃ³n
-        if self._tempo_repeat_thread is None or not self._tempo_repeat_thread.is_alive():
-            self._tempo_repeat_thread = threading.Thread(
-                target=self._tempo_repeat_worker, 
-                args=('up',),
-                daemon=True
-            )
-            self._tempo_repeat_thread.start()
-    
+            self._callbacks['tempo_up'](0.1)
+
     def _on_tempo_up_release(self):
-        """Detiene el ajuste hacia arriba"""
-        self._tempo_up_held = False
-    
-    def _tempo_repeat_worker(self, direction):
-        """
-        Worker thread que repite el ajuste mientras el botÃ³n estÃ© pulsado
-        Delta progresivo:
-        - 0-1s: 0.1s por pulsaciÃ³n (ajuste fino)
-        - 1-2s: 0.5s por pulsaciÃ³n (ajuste medio)
-        - >2s: 1.0s por pulsaciÃ³n (ajuste rÃ¡pido)
-        """
-        time.sleep(0.3)  # Delay inicial antes de empezar a repetir
-        
-        callback = self._callbacks['tempo_down'] if direction == 'down' else self._callbacks['tempo_up']
-        is_held = lambda: self._tempo_down_held if direction == 'down' else self._tempo_up_held
-        
-        if not callback:
-            return
-        
-        while is_held():
-            # Calcular tiempo transcurrido desde que se pulsÃ³
-            elapsed = time.time() - self._tempo_hold_start_time
-            
-            # Determinar delta segÃºn tiempo transcurrido
-            if elapsed < 1.0:
-                delta = 0.1
-                repeat_delay = 0.15  # Repetir cada 150ms
-            elif elapsed < 2.0:
-                delta = 0.5
-                repeat_delay = 0.12  # Repetir cada 120ms (mÃ¡s rÃ¡pido)
-            else:
-                delta = 1.0
-                repeat_delay = 0.10  # Repetir cada 100ms (aÃºn mÃ¡s rÃ¡pido)
-            
-            # Llamar al callback con el delta apropiado
-            callback(delta)
-            
-            # Esperar antes de la siguiente repeticiÃ³n
-            time.sleep(repeat_delay)
+        """GPIO22 release - no hace nada en modo simple"""
+        pass
+
+
+
+
     
     # === API pÃºblica para asignar callbacks ===
     def set_callback(self, event, callback):
@@ -225,6 +254,7 @@ class ButtonsManager:
         - 'mark_b_tap', 'mark_b_hold'
         - 'stop_tap', 'stop_hold'
         - 'tempo_down', 'tempo_up'
+        - 'save_loop
         """
         if event in self._callbacks:
             self._callbacks[event] = callback
@@ -243,10 +273,12 @@ class ButtonsManager:
         self.set_callback('tempo_up', on_next)
         self.set_callback('play', on_select)
         self.set_callback('stop_hold', on_exit)
-    
+        # Limpiar save_loop en modo browser
+        self.set_callback('save_loop', None)
+
     def set_player_mode(self, on_play, on_play_hold, on_mark_a_tap, on_mark_a_hold,
                         on_mark_b_tap, on_mark_b_hold, on_stop, on_back,
-                        on_tempo_down, on_tempo_up):
+                        on_tempo_down, on_tempo_up, on_save_loop=None):
         """
         Configura callbacks para modo PLAYER
         """
@@ -260,6 +292,8 @@ class ButtonsManager:
         self.set_callback('stop_hold', on_back)
         self.set_callback('tempo_down', on_tempo_down)
         self.set_callback('tempo_up', on_tempo_up)
+        if on_save_loop:
+            self.set_callback('save_loop', on_save_loop)
     
     def close(self):
         """Libera recursos GPIO"""
