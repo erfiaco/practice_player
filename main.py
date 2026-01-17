@@ -3,8 +3,8 @@
 Practice Player - Reproductor para estudiar solos con loop A-B y control de tempo
 
 Estados:
-- BROWSER: SelecciÃ³n de archivos
-- PLAYER: ReproducciÃ³n con controles
+- BROWSER: SelecciÃƒÂ³n de archivos
+- PLAYER: ReproducciÃƒÂ³n con controles
 """
 
 import signal
@@ -26,10 +26,10 @@ class PracticePlayer:
         self.player = AudioPlayer(on_state_change=self._update_ui)
         self.buttons = ButtonsManager()
         
-        # Configurar botones segÃºn estado inicial
+        # Configurar botones segÃƒÂºn estado inicial
         self._set_browser_mode()
         
-        # SeÃ±ales de sistema
+        # SeÃƒÂ±ales de sistema
         signal.signal(signal.SIGINT, self._signal_handler)
         signal.signal(signal.SIGTERM, self._signal_handler)
         
@@ -39,7 +39,7 @@ class PracticePlayer:
         self.ui_thread = threading.Thread(target=self._ui_refresh_loop, daemon=True)
         self.ui_thread.start()
     
-    # ========== MÃQUINA DE ESTADOS ==========
+    # ========== MÃƒÂQUINA DE ESTADOS ==========
     
     def _set_browser_mode(self):
         """Configura botones para modo BROWSER"""
@@ -51,7 +51,7 @@ class PracticePlayer:
             on_exit=self._browser_exit
         )
         self._update_ui("Modo BROWSER")
-        print("â†’ Modo BROWSER activado")
+        print("Ã¢â€ â€™ Modo BROWSER activado")
     
     def _set_player_mode(self):
         """Configura botones para modo PLAYER"""
@@ -65,33 +65,33 @@ class PracticePlayer:
             on_mark_b_hold=self._player_mark_b_hold,
             on_stop=self._player_stop,
             on_back=self._player_back,
-            #on_tempo_down=self._player_tempo_down,
-            #on_tempo_up=self._player_tempo_up
+            on_tempo_down=self._player_tempo_down,
+            on_tempo_up=self._player_tempo_up,
             on_save_loop=self._player_save_loop
         )
         self._update_ui("Modo PLAYER")
-        print("â†’ Modo PLAYER activado")
+        print("Ã¢â€ â€™ Modo PLAYER activado")
     
     # ========== CALLBACKS BROWSER ==========
     
     def _browser_prev(self, delta=None):
         """GPIO23: Archivo anterior"""
-        print("â†’ [BROWSER] Archivo anterior")
+        print("Ã¢â€ â€™ [BROWSER] Archivo anterior")
         self.browser.prev_file()
         self._update_ui()
     
     def _browser_next(self, delta=None):
         """GPIO22: Archivo siguiente"""
-        print("â†’ [BROWSER] Archivo siguiente")
+        print("Ã¢â€ â€™ [BROWSER] Archivo siguiente")
         self.browser.next_file()
         self._update_ui()
     
     def _browser_select(self):
         """GPIO13 TAP: Seleccionar archivo y pasar a PLAYER"""
-        print("â†’ [BROWSER] Seleccionar archivo")
+        print("Ã¢â€ â€™ [BROWSER] Seleccionar archivo")
         
         if not self.browser.has_files():
-            print("âš  No hay archivos WAV disponibles")
+            print("Ã¢Å¡Â  No hay archivos WAV disponibles")
             return
         
         filepath = self.browser.get_current_file()
@@ -101,18 +101,18 @@ class PracticePlayer:
             # Cambiar a modo player
             self._set_player_mode()
         else:
-            print("âš  Error al cargar archivo")
+            print("Ã¢Å¡Â  Error al cargar archivo")
     
     def _browser_exit(self):
         """GPIO13 HOLD: Salir del programa"""
-        print("â†’ [BROWSER] Salir al boot menu")
+        print("Ã¢â€ â€™ [BROWSER] Salir al boot menu")
         self.exit_event.set()
     
     # ========== CALLBACKS PLAYER ==========
     
     def _player_play(self):
         """GPIO5: Play/Pause"""
-        print("â†’ [PLAYER] Play/Pause")
+        print("Ã¢â€ â€™ [PLAYER] Play/Pause")
         
         # Si estamos ajustando, salir del modo ajuste
         if self.player.adjusting_point:
@@ -123,104 +123,110 @@ class PracticePlayer:
         self._update_ui()
     
     def _player_play_hold(self):
-        """GPIO5 HOLD: Entrar en modo ajuste de posiciÃ³n"""
-        print("â†' [PLAYER] Ajustar posiciÃ³n")
+        """GPIO5 HOLD: Entrar en modo ajuste de posiciÃƒÂ³n"""
+        print("Ã¢â€ ' [PLAYER] Ajustar posiciÃƒÂ³n")
         self.player.start_adjusting_position()
         self._update_ui()
     
     def _player_mark_a_tap(self):
         """GPIO26 TAP: Marcar/desmarcar punto A"""
-        print("â†’ [PLAYER] Toggle punto A")
+        print("Ã¢â€ â€™ [PLAYER] Toggle punto A")
         self.player.toggle_point_a()
         self._update_ui()
     
     def _player_mark_a_hold(self):
         """GPIO26 HOLD: Entrar en modo ajuste de punto A"""
-        print("â†’ [PLAYER] Ajustar punto A")
+        print("Ã¢â€ â€™ [PLAYER] Ajustar punto A")
         self.player.start_adjusting_a()
         self._update_ui()
     
     def _player_mark_b_tap(self):
         """GPIO6 TAP: Marcar/desmarcar punto B"""
-        print("â†’ [PLAYER] Toggle punto B")
+        print("Ã¢â€ â€™ [PLAYER] Toggle punto B")
         self.player.toggle_point_b()
         self._update_ui()
     
     def _player_mark_b_hold(self):
         """GPIO6 HOLD: Entrar en modo ajuste de punto B"""
-        print("â†’ [PLAYER] Ajustar punto B")
+        print("Ã¢â€ â€™ [PLAYER] Ajustar punto B")
         self.player.start_adjusting_b()
         self._update_ui()
     
     def _player_stop(self):
         """GPIO13 TAP: Stop"""
-        print("â†’ [PLAYER] Stop")
+        print("Ã¢â€ â€™ [PLAYER] Stop")
         self.player.stop()
         self._update_ui()
     
     def _player_back(self):
         """GPIO13 HOLD: Volver a BROWSER"""
-        print("â†’ [PLAYER] Volver a BROWSER")
+        print("Ã¢â€ â€™ [PLAYER] Volver a BROWSER")
         self.player.stop()
         self._set_browser_mode()
-
-    def _player_save_loop(self):
-        """GPIO23 TAP: Guardar sección A-B como archivo WAV"""
-        print("✓ [PLAYER] Guardar loop A-B")
-
-        success, message = self.player.save_loop()
-
-        if success:
-            print(f"✓ {message}")
-            # Mostrar mensaje en display
-            self.display.show_message(message)
-            time.sleep(2)  # Mostrar por 2 segundos
-
-            # Refresh del browser para que aparezca el nuevo archivo
-            self.browser.refresh()
+    
+    def _player_tempo_down(self, delta=0.1):
+        """
+        GPIO23: Tempo -1% o ajuste fino con delta variable
+        delta: segundos a ajustar (0.1, 0.5, o 1.0 segÃƒÂºn tiempo pulsado)
+        """
+        if self.player.adjusting_point:
+            # En modo ajuste: mover -delta segundos
+            print(f"â†’ [PLAYER] Ajustar -{delta}s")
+            self.player.adjust_fine(-delta)
         else:
-            print(f"✗ {message}")
-            self.display.show_message(f"Error: {message}")
-            time.sleep(2)
-
+            # Normal: tempo -1%
+            print("Ã¢â€ â€™ [PLAYER] Tempo -1%")
+            self.player.change_tempo(-1)
+        
         self._update_ui()
     
-#    def _player_tempo_down(self, delta=0.1):
-#        """
-#        GPIO23: Tempo -1% o ajuste fino con delta variable
-#        delta: segundos a ajustar (0.1, 0.5, o 1.0 segÃºn tiempo pulsado)
-#        """
-#        if self.player.adjusting_point:
-#            # En modo ajuste: mover -delta segundos
-#            print(f"→ [PLAYER] Ajustar -{delta}s")
-#            self.player.adjust_fine(-delta)
-#        else:
-#            # Normal: tempo -1%
-#            print("â†’ [PLAYER] Tempo -1%")
-#            self.player.change_tempo(-1)
-#
-#        self._update_ui()
-#
-#    def _player_tempo_up(self, delta=0.1):
-#        """
-#        GPIO22: Tempo +1% o ajuste fino con delta variable
-#        delta: segundos a ajustar (0.1, 0.5, o 1.0 según tiempo pulsado)
-#        """
-#        if self.player.adjusting_point:
-#            # En modo ajuste: mover +delta segundos
-#            print(f"→ [PLAYER] Ajustar +{delta}s")
-#            self.player.adjust_fine(+delta)
-#        else:
-#            # Normal: tempo +1%
-#            print("â†’ [PLAYER] Tempo +1%")
-#            self.player.change_tempo(+1)
-#
-#        self._update_ui()
+    def _player_tempo_up(self, delta=0.1):
+        """
+        GPIO22: Tempo +1% o ajuste fino con delta variable
+        delta: segundos a ajustar (0.1, 0.5, o 1.0 segÃºn tiempo pulsado)
+        """
+        if self.player.adjusting_point:
+            # En modo ajuste: mover +delta segundos
+            print(f"â†’ [PLAYER] Ajustar +{delta}s")
+            self.player.adjust_fine(+delta)
+        else:
+            # Normal: tempo +1%
+            print("Ã¢â€ â€™ [PLAYER] Tempo +1%")
+            self.player.change_tempo(+1)
+        
+        self._update_ui()
+    
+    def _player_save_loop(self):
+        """GPIO4: Guardar sección A-B como nuevo archivo"""
+        print("✓ [PLAYER] Guardar loop")
+        
+        # Mostrar mensaje de procesamiento
+        self.display.show_processing("Saving loop...")
+        
+        # Guardar el loop
+        filename = self.player.save_loop(output_dir="audio_files")
+        
+        if filename:
+            # Éxito - mostrar mensaje
+            self.display.show_message(f"Saved: {filename}")
+            time.sleep(2)
+            
+            # Refrescar browser para que aparezca el nuevo archivo
+            self.browser.refresh()
+            
+            print(f"✓ Loop guardado como: {filename}")
+        else:
+            # Error
+            self.display.show_message("Error: Check A-B points")
+            time.sleep(2)
+        
+        # Volver a mostrar player UI
+        self._update_ui()
     
     # ========== UI ==========
     
     def _update_ui(self, message=""):
-        """Actualiza el display segÃºn el estado actual"""
+        """Actualiza el display segÃƒÂºn el estado actual"""
         if message:
             print(f"[UI] {message}")
         
@@ -232,7 +238,7 @@ class PracticePlayer:
         # para evitar sobrecarga en callbacks
     
     def _ui_refresh_loop(self):
-        """Thread que actualiza el UI periÃ³dicamente"""
+        """Thread que actualiza el UI periÃƒÂ³dicamente"""
         while self.ui_refresh_active and not self.exit_event.is_set():
             try:
                 if self.state == 'BROWSER':
@@ -285,10 +291,10 @@ class PracticePlayer:
                 help_text=help_text
             )
     
-    # ========== SEÃ‘ALES ==========
+    # ========== SEÃƒâ€˜ALES ==========
     
     def _signal_handler(self, signum, frame):
-        print("\nSeÃ±al recibida â†’ Saliendo limpiamente")
+        print("\nSeÃƒÂ±al recibida Ã¢â€ â€™ Saliendo limpiamente")
         self.exit_event.set()
     
     # ========== RUN & CLEANUP ==========
@@ -305,7 +311,7 @@ class PracticePlayer:
                 time.sleep(0.1)
         
         except KeyboardInterrupt:
-            print("\nInterrupciÃ³n de teclado")
+            print("\nInterrupciÃƒÂ³n de teclado")
         
         finally:
             self.cleanup()
@@ -319,7 +325,7 @@ class PracticePlayer:
         self.display.clear()
         self.buttons.close()
         
-        print("Â¡AdiÃ³s!")
+        print("Ã‚Â¡AdiÃƒÂ³s!")
         
         # Volver al boot menu
         import subprocess
