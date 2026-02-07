@@ -13,13 +13,13 @@ class ButtonsManager:
     
     def __init__(self):
         # Inicializar botones con pull_up
-        self.btn_play     = Button(5,  pull_up=True, bounce_time=0.03, hold_time=3.0)
-        self.btn_mark_a   = Button(26, pull_up=True, bounce_time=0.03, hold_time=1.0)
+        self.btn_play     = Button(13,  pull_up=True, bounce_time=0.03, hold_time=3.0)
+        self.btn_mark_a   = Button(19, pull_up=True, bounce_time=0.03, hold_time=1.0)
         self.btn_mark_b   = Button(6,  pull_up=True, bounce_time=0.03, hold_time=1.0)
-        self.btn_stop     = Button(13, pull_up=True, bounce_time=0.03, hold_time=3.0)
-        self.btn_tempo_dn = Button(23, pull_up=True, bounce_time=0.03, hold_time=0.3)
+        self.btn_stop     = Button(5, pull_up=True, bounce_time=0.03, hold_time=3.0)
+        self.btn_tempo_dn = Button(9, pull_up=True, bounce_time=0.03, hold_time=0.3)
         self.btn_tempo_up = Button(22, pull_up=True, bounce_time=0.03, hold_time=0.3)
-        self.btn_save_loop = Button(4, pull_up=True, bounce_time=0.03, hold_time=1.0)
+        self.btn_save_loop = Button(25, pull_up=True, bounce_time=0.03, hold_time=1.0)
         
         # Callbacks vacÃƒÂ­os por defecto
         self._callbacks = {
