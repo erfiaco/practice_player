@@ -1,15 +1,21 @@
 from luma.core.interface.serial import i2c
 from luma.oled.device import ssd1306
 from PIL import Image, ImageDraw, ImageFont
+import threading
+import time
 
 class OledDisplay:
-    """Display OLED para Practice Player"""
+    """Display OLED para Practice Player con protección timeout I2C"""
     
     def __init__(self, port=1, address=0x3C, width=128, height=64):
         # Inicializar I2C y device
         self.serial = i2c(port=port, address=address)
         self.device = ssd1306(self.serial, width=width, height=height)
         self.W, self.H = self.device.size
+        
+        # Flag para detectar errores I2C
+        self.i2c_error_count = 0
+        self.i2c_disabled = False
         
         # Fuentes
         try:
@@ -21,99 +27,139 @@ class OledDisplay:
             self.font_med = ImageFont.load_default()
             self.font_small = ImageFont.load_default()
     
+    def _safe_display(self, img, timeout=1.0):
+        """
+        Wrapper seguro para self.device.display() con timeout
+        
+        Si la operación I2C se bloquea más de timeout segundos:
+        - Retorna False
+        - Incrementa contador de errores
+        - Si hay demasiados errores, deshabilita el display
+        """
+        if self.i2c_disabled:
+            return False
+        
+        result = {'success': False, 'error': None}
+        
+        def display_worker():
+            try:
+                self.device.display(img)
+                result['success'] = True
+            except Exception as e:
+                result['error'] = e
+        
+        # Ejecutar en thread con timeout
+        thread = threading.Thread(target=display_worker, daemon=True)
+        thread.start()
+        thread.join(timeout=timeout)
+        
+        if thread.is_alive():
+            # Timeout - el thread sigue bloqueado
+            self.i2c_error_count += 1
+            print(f"⚠ OLED timeout #{self.i2c_error_count} - I2C no responde")
+            
+            # Si hay muchos errores consecutivos, deshabilitar display
+            if self.i2c_error_count >= 5:
+                self.i2c_disabled = True
+                print("⚠⚠⚠ OLED deshabilitado - demasiados timeouts I2C")
+            
+            return False
+        
+        if result['error']:
+            self.i2c_error_count += 1
+            print(f"⚠ OLED error: {result['error']}")
+            return False
+        
+        # Operación exitosa - resetear contador
+        if result['success']:
+            self.i2c_error_count = 0
+            return True
+        
+        return False
+    
     def clear(self):
         """Limpia la pantalla"""
         img = Image.new("1", (self.W, self.H))
-        self.device.display(img)
+        self._safe_display(img)
     
     def show_browser(self, filename, position, total, help_text="STOP(3s)=Exit"):
         """
         Muestra el modo BROWSER
-        â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-        â”‚ MODE: BROWSER          â”‚
-        â”‚ â–º solo_django.wav      â”‚
-        â”‚   3/15 files           â”‚
-        â”‚ STOP(3s)=Exit          â”‚
-        â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+        ┌────────────────────────┐
+        │ MODE: BROWSER          │
+        │ ► solo_django.wav      │
+        │   3/15 files           │
+        │ STOP(3s)=Exit          │
+        └────────────────────────┘
         """
         img = Image.new("1", (self.W, self.H))
         d = ImageDraw.Draw(img)
         
-        # LÃ­nea 1: Modo
+        # Línea 1: Modo
         d.text((0, 0), "BROWSER", font=self.font_big, fill=255)
         
-        # LÃ­nea 2: Archivo actual con indicador
-        # Truncar nombre si es muy largo
-        display_name = filename
-        if len(filename) > 20:
-            display_name = filename[:17] + "..."
-        d.text((0, 18), f"> {display_name}", font=self.font_med, fill=255)
+        # Línea 2: Nombre de archivo (truncar si es muy largo)
+        display_name = filename[:18] if len(filename) > 18 else filename
+        d.text((0, 20), f"► {display_name}", font=self.font_med, fill=255)
         
-        # LÃ­nea 3: PosiciÃ³n
-        d.text((0, 35), f"  {position}/{total} files", font=self.font_small, fill=255)
+        # Línea 3: Posición
+        d.text((0, 36), f"  {position}/{total} files", font=self.font_small, fill=255)
         
-        # LÃ­nea 4: Ayuda
+        # Línea 4: Ayuda
         d.text((0, 50), help_text, font=self.font_small, fill=255)
         
-        self.device.display(img)
+        self._safe_display(img)
     
-    def show_player(self, state, current_time, total_time, 
-                    point_a=None, point_b=None, tempo=100, 
-                    help_text="STOP(3s)=Back"):
+    def show_player(self, state, current_time, total_time, point_a=None, point_b=None, 
+                    tempo=100, help_text="PLAY A B STOP"):
         """
         Muestra el modo PLAYER
-        â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-        â”‚ â–¶ PLAYING [A-B] 85%    â”‚
-        â”‚ 00:12.3 / 00:45.8      â”‚
-        â”‚ A:00:08.1 B:00:15.7    â”‚
-        â”‚ STOP(3s)=Back          â”‚
-        â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
-        
-        state: 'PLAYING', 'PAUSED', 'STOPPED'
-        times en segundos (float)
+        ┌────────────────────────┐
+        │ ▶ PLAYING   100%       │
+        │ 00:08.1 / 03:24.5      │
+        │ A:01:20  B:02:45       │
+        │ PLAY A B STOP          │
+        └────────────────────────┘
         """
         img = Image.new("1", (self.W, self.H))
         d = ImageDraw.Draw(img)
         
-        # LÃ­nea 1: Estado + Loop activo + Tempo
-        state_icon = "â–¶" if state == "PLAYING" else "â¸" if state == "PAUSED" else "â¹"
-        loop_indicator = "[A-B]" if point_a is not None and point_b is not None else ""
-        tempo_str = f"{tempo}%" if tempo != 100 else ""
+        # Línea 1: Estado y tempo
+        state_icon = "▶" if state == "PLAYING" else "⏸" if state == "PAUSED" else "⏹"
+        d.text((0, 0), f"{state_icon} {state}", font=self.font_big, fill=255)
+        d.text((100, 0), f"{tempo}%", font=self.font_med, fill=255)
         
-        line1 = f"{state_icon} {state} {loop_indicator} {tempo_str}".strip()
-        d.text((0, 0), line1, font=self.font_med, fill=255)
-        
-        # LÃ­nea 2: Tiempo actual / DuraciÃ³n total
+        # Línea 2: Tiempo
         current_str = self._format_time(current_time)
         total_str = self._format_time(total_time)
         d.text((0, 16), f"{current_str} / {total_str}", font=self.font_big, fill=255)
         
-        # LÃ­nea 3: Puntos A y B
+        # Línea 3: Puntos A y B
         if point_a is not None or point_b is not None:
             a_str = f"A:{self._format_time(point_a)}" if point_a is not None else "A:--"
             b_str = f"B:{self._format_time(point_b)}" if point_b is not None else "B:--"
             d.text((0, 36), f"{a_str}  {b_str}", font=self.font_small, fill=255)
         
-        # LÃ­nea 4: Ayuda
+        # Línea 4: Ayuda
         d.text((0, 50), help_text, font=self.font_small, fill=255)
         
-        self.device.display(img)
+        self._safe_display(img)
     
     def show_adjusting(self, point_name, value):
         """
         Muestra pantalla de ajuste fino
-        â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-        â”‚   ADJUSTING POINT A    â”‚
-        â”‚                        â”‚
-        â”‚    00:08.147           â”‚
-        â”‚                        â”‚
-        â”‚  â—€ -0.1s    +0.1s â–¶    â”‚
-        â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+        ┌────────────────────────┐
+        │   ADJUSTING POINT A    │
+        │                        │
+        │    00:08.147           │
+        │                        │
+        │  ◀ -0.1s    +0.1s ▶    │
+        └────────────────────────┘
         """
         img = Image.new("1", (self.W, self.H))
         d = ImageDraw.Draw(img)
         
-        # TÃ­tulo centrado
+        # Título centrado
         if point_name == 'POSITION':
             title = "ADJUSTING POSITION"
         else:
@@ -125,9 +171,9 @@ class OledDisplay:
         d.text((25, 25), time_str, font=self.font_big, fill=255)
         
         # Indicadores de control
-        d.text((5, 50), "â—€ -0.1s    +0.1s â–¶", font=self.font_small, fill=255)
+        d.text((5, 50), "◀ -0.1s    +0.1s ▶", font=self.font_small, fill=255)
         
-        self.device.display(img)
+        self._safe_display(img)
     
     def show_processing(self, message="Processing..."):
         """Muestra mensaje de procesamiento (para time-stretch)"""
@@ -136,21 +182,21 @@ class OledDisplay:
         
         d.text((20, 25), message, font=self.font_big, fill=255)
         
-        self.device.display(img)
+        self._safe_display(img)
     
     def show_message(self, message):
-        """Muestra un mensaje genÃ©rico centrado"""
+        """Muestra un mensaje genérico centrado"""
         img = Image.new("1", (self.W, self.H))
         d = ImageDraw.Draw(img)
         
-        # Dividir en lÃ­neas si es muy largo
+        # Dividir en líneas si es muy largo
         lines = self._wrap_text(message, 21)
         y = 20
-        for line in lines[:3]:  # MÃ¡ximo 3 lÃ­neas
+        for line in lines[:3]:  # Máximo 3 líneas
             d.text((5, y), line, font=self.font_med, fill=255)
             y += 15
         
-        self.device.display(img)
+        self._safe_display(img)
     
     def _format_time(self, seconds, show_ms=False):
         """
@@ -169,7 +215,7 @@ class OledDisplay:
             return f"{mins:02d}:{secs:04.1f}"
     
     def _wrap_text(self, text, max_chars):
-        """Divide texto en lÃ­neas de max_chars"""
+        """Divide texto en líneas de max_chars"""
         words = text.split()
         lines = []
         current_line = ""
