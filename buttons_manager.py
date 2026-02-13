@@ -5,6 +5,13 @@ import threading
 
 Device.pin_factory = LGPIOFactory()
 
+# OPTIMIZACIÓN: Reducir polling de 0.5ms a 10ms
+try:
+    Device.pin_factory._poll_interval = 0.01  # 10ms
+    print(f"GPIO polling optimizado: 0.5ms → 10.0ms")
+except:
+    pass
+    
 class ButtonsManager:
     """
     Gestor de botones para Practice Player
