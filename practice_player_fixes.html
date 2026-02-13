@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Practice Player - Lista de Modificaciones</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #34495e;
+            margin-top: 30px;
+            padding: 10px;
+            background: #ecf0f1;
+            border-left: 4px solid #3498db;
+        }
+        h3 {
+            color: #2980b9;
+            margin-top: 25px;
+        }
+        .priority-critical {
+            background: #ffebee;
+            border-left: 4px solid #e74c3c;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        .priority-high {
+            background: #fff3e0;
+            border-left: 4px solid #f39c12;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        .priority-medium {
+            background: #e8f5e9;
+            border-left: 4px solid #27ae60;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        .priority-low {
+            background: #e3f2fd;
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        .item-title {
+            font-weight: bold;
+            font-size: 1.1em;
+            color: #2c3e50;
+            margin-bottom: 8px;
+        }
+        .item-section {
+            margin: 8px 0;
+        }
+        .item-section strong {
+            color: #7f8c8d;
+            display: inline-block;
+            min-width: 100px;
+        }
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .badge-critical {
+            background: #e74c3c;
+            color: white;
+        }
+        .badge-high {
+            background: #f39c12;
+            color: white;
+        }
+        .badge-medium {
+            background: #27ae60;
+            color: white;
+        }
+        .badge-low {
+            background: #3498db;
+            color: white;
+        }
+        .order-list {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .order-item {
+            padding: 10px;
+            margin: 10px 0;
+            background: #f8f9fa;
+            border-radius: 4px;
+            border-left: 3px solid #3498db;
+        }
+        .order-number {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            background: #3498db;
+            color: white;
+            text-align: center;
+            line-height: 30px;
+            border-radius: 50%;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        ul {
+            margin: 10px 0;
+            padding-left: 25px;
+        }
+        li {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>📋 Practice Player - Lista de Modificaciones</h1>
+    <p><strong>Fecha:</strong> 13 de Febrero 2026</p>
+    <p><strong>Diagnóstico:</strong> Congelamiento del programa debido a I2S SYNC errors y polling GPIO agresivo</p>
+
+    <h2>🔴 SOFTWARE (Código Python - Practice Player)</h2>
+
+    <div class="priority-critical">
+        <div class="item-title">1. GPIO Polling <span class="badge badge-critical">PRIORIDAD CRÍTICA</span></div>
+        <div class="item-section">
+            <strong>Problema:</strong> Thread 2085 hace polling cada 0.5ms (2000 checks/segundo)
+        </div>
+        <div class="item-section">
+            <strong>Acción:</strong> Cambiar timeout de GPIO ppoll de 0.5ms → 10-50ms
+        </div>
+        <div class="item-section">
+            <strong>Ubicación:</strong> Código que lee botones GPIO
+        </div>
+        <div class="item-section">
+            <strong>Impacto:</strong> Reducirá CPU usage de 20% → ~2%
+        </div>
+    </div>
+
+    <div class="priority-high">
+        <div class="item-title">2. I2C Timeout <span class="badge badge-high">PRIORIDAD ALTA</span></div>
+        <div class="item-section">
+            <strong>Problema:</strong> Escrituras a OLED se bloquean indefinidamente cuando hay I2S errors
+        </div>
+        <div class="item-section">
+            <strong>Acción:</strong> Añadir timeout de 1 segundo a todas las operaciones OLED
+        </div>
+        <div class="item-section">
+            <strong>Ubicación:</strong> Llamadas a <code>oled.write()</code>, <code>oled.display()</code>, etc.
+        </div>
+        <div class="item-section">
+            <strong>Impacto:</strong> Evitará que el programa se congele completamente
+        </div>
+    </div>
+
+    <div class="priority-high">
+        <div class="item-title">3. I2S Error Handling <span class="badge badge-high">PRIORIDAD ALTA</span></div>
+        <div class="item-section">
+            <strong>Problema:</strong> No hay detección/recuperación de I2S SYNC errors
+        </div>
+        <div class="item-section">
+            <strong>Acción:</strong>
+            <ul>
+                <li>Monitorear dmesg/journalctl para I2S errors</li>
+                <li>Reiniciar audio stream cuando hay &gt;5 errors consecutivos</li>
+                <li>Mostrar warning en OLED</li>
+            </ul>
+        </div>
+        <div class="item-section">
+            <strong>Ubicación:</strong> Módulo de audio/playback
+        </div>
+        <div class="item-section">
+            <strong>Impacto:</strong> Recuperación automática en vez de congelamiento
+        </div>
+    </div>
+
+    <div class="priority-medium">
+        <div class="item-title">4. Thread Management <span class="badge badge-medium">PRIORIDAD MEDIA</span></div>
+        <div class="item-section">
+            <strong>Problema:</strong> 19 threads activos (¿muchos innecesarios?)
+        </div>
+        <div class="item-section">
+            <strong>Acción:</strong> Revisar qué threads son realmente necesarios
+        </div>
+        <div class="item-section">
+            <strong>Ubicación:</strong> Revisar todo el código que crea threads
+        </div>
+        <div class="item-section">
+            <strong>Impacto:</strong> Menos overhead, más estabilidad
+        </div>
+    </div>
+
+    <h2>⚡ HARDWARE (Físico)</h2>
+
+    <div class="priority-critical">
+        <div class="item-title">5. Power Supply Decoupling <span class="badge badge-critical">PRIORIDAD CRÍTICA</span></div>
+        <div class="item-section">
+            <strong>Problema:</strong> Power noise causa I2S SYNC errors → root cause
+        </div>
+        <div class="item-section">
+            <strong>Acción:</strong>
+            <ul>
+                <li>Añadir capacitor cerámico 104 (0.1µF) cerca de WM8731</li>
+                <li>Añadir capacitor electrolítico 100µF en power rail</li>
+                <li>Implementar star grounding pattern</li>
+            </ul>
+        </div>
+        <div class="item-section">
+            <strong>Ubicación:</strong> AudioInjector Zero board
+        </div>
+        <div class="item-section">
+            <strong>Impacto:</strong> Eliminará/reducirá I2S SYNC errors
+        </div>
+    </div>
+
+    <div class="priority-low">
+        <div class="item-title">6. Button Hardware Quality <span class="badge badge-low">PRIORIDAD BAJA</span></div>
+        <div class="item-section">
+            <strong>Problema:</strong> Botones AliExpress con 35% reliability en GPIO 6
+        </div>
+        <div class="item-section">
+            <strong>Acción:</strong> Reemplazar con Omron B3F switches (cuando sea posible)
+        </div>
+        <div class="item-section">
+            <strong>Ubicación:</strong> Todos los botones
+        </div>
+        <div class="item-section">
+            <strong>Impacto:</strong> Mejor detección, menos false negatives
+        </div>
+    </div>
+
+    <h2>📊 Orden Sugerido de Implementación</h2>
+
+    <div class="order-list">
+        <div class="order-item">
+            <span class="order-number">1</span>
+            <strong>GPIO Polling</strong> (software - 5 minutos)
+        </div>
+        <div class="order-item">
+            <span class="order-number">2</span>
+            <strong>I2C Timeout</strong> (software - 15 minutos)
+        </div>
+        <div class="order-item">
+            <span class="order-number">3</span>
+            <strong>Power Decoupling</strong> (hardware - 30 minutos soldering)
+        </div>
+        <div class="order-item">
+            <span class="order-number">4</span>
+            <strong>I2S Error Handling</strong> (software - 1 hora)
+        </div>
+        <div class="order-item">
+            <span class="order-number">5</span>
+            <strong>Thread Review</strong> (software - depende)
+        </div>
+        <div class="order-item">
+            <span class="order-number">6</span>
+            <strong>Button Upgrade</strong> (hardware - opcional/futuro)
+        </div>
+    </div>
+
+    <h2>🎯 Próximos Pasos</h2>
+    <p>Comenzar con el <strong>#1 (GPIO polling)</strong> - es el cambio más rápido y con mayor impacto inmediato.</p>
+
+</body>
+</html>

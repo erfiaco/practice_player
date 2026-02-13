@@ -3,6 +3,7 @@ import soundfile as sf
 import numpy as np
 import threading
 import time
+sd.default.device = 0  # AudioInjector (hw:1,0)
 
 class AudioPlayer:
     """
@@ -356,7 +357,7 @@ class AudioPlayer:
         
         # Reproducir
         playback_start_time = time.perf_counter()  # Ã¢Â­Â Timestamp de inicio
-        sd.play(section, self.samplerate)
+        sd.play(section, self.samplerate, device=0)
         time.sleep(0.01)  # Ã¢Â­Â PequeÃƒÂ±o delay para que el stream se inicialice
         
         # Actualizar posiciÃƒÂ³n mientras reproduce
@@ -372,7 +373,7 @@ class AudioPlayer:
                     remaining_start = int(self.current_position * self.samplerate)
                     remaining_section = self.audio_data[remaining_start:end_sample]
                     playback_start_time = time.perf_counter()  # Ã¢Â­Â Reset timestamp
-                    sd.play(remaining_section, self.samplerate)
+                    sd.play(remaining_section, self.samplerate, device=0)
                     time.sleep(0.01)  # Ã¢Â­Â Delay para inicializaciÃƒÂ³n del stream
             
             # Actualizar posiciÃƒÂ³n usando perf_counter en vez de sd.get_stream().time
