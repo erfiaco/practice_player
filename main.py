@@ -209,7 +209,7 @@ class PracticePlayer:
         if filename:
             # Éxito - mostrar mensaje
             self.display.show_message(f"Saved: {filename}")
-            time.sleep(2)
+            time.sleep(3)
             
             # Refrescar browser para que aparezca el nuevo archivo
             self.browser.refresh()
@@ -218,7 +218,7 @@ class PracticePlayer:
         else:
             # Error
             self.display.show_message("Error: Check A-B points")
-            time.sleep(2)
+            time.sleep(3)
         
         # Volver a mostrar player UI
         self._update_ui()

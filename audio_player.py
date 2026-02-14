@@ -466,7 +466,7 @@ class AudioPlayer:
             
             duration = len(section) / self.samplerate
             print(f"[Ok] Loop guardado: {output_filename} ({duration:.1f}s)")
-            
+            time.sleep(2)
             return output_filename
             
         except Exception as e:
