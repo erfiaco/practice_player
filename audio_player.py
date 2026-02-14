@@ -1,9 +1,19 @@
+"""
+Audio Player - Reproductor con loop A-B y control de tempo
+
+CAMBIOS PARA TEMPO:
+- change_tempo() ahora procesa de forma asíncrona
+- Auto-pause cuando se cambia tempo
+- Callback para reportar progreso al display
+- Cache de audio procesado
+"""
+
 import sounddevice as sd
 import soundfile as sf
 import numpy as np
 import threading
 import time
-sd.default.device = 0  # AudioInjector (hw:1,0)
+from tempo_controller import TempoController
 
 class AudioPlayer:
     """
@@ -12,14 +22,14 @@ class AudioPlayer:
     
     def __init__(self, on_state_change=None):
         self.filepath = None
-        self.audio_data = None
+        self.audio_data = None  # Audio original sin modificar
         self.samplerate = None
         self.duration = 0.0
         
-        # Estado de reproducciÃƒÂ³n
+        # Estado de reproducción
         self.is_playing = False
         self.is_paused = False
-        self.current_position = 0.0  # PosiciÃƒÂ³n en segundos
+        self.current_position = 0.0  # Posición en segundos
         
         # Loop A-B
         self.point_a = None
@@ -27,10 +37,13 @@ class AudioPlayer:
         
         # Tempo
         self.tempo_percent = 100  # 100% = velocidad normal
+        self.tempo_controller = TempoController()
         self.processed_audio = None  # Audio con tempo aplicado
+        self.is_processing_tempo = False  # Flag para indicar procesamiento en curso
         
         # Threading
         self.playback_thread = None
+        self.tempo_thread = None
         self.stop_event = threading.Event()
         self.pause_event = threading.Event()
         
@@ -45,10 +58,10 @@ class AudioPlayer:
     def load_file(self, filepath):
         """Carga un archivo WAV en memoria"""
         try:
-            self.stop()  # Detener reproducciÃƒÂ³n anterior
+            self.stop()  # Detener reproducción anterior
             
             print(f"Cargando: {filepath}")
-            self.audio_data, self.samplerate = sf.read(filepath)
+            self.audio_data, self.samplerate = sf.read(filepath, dtype='float32')
             self.filepath = filepath
             self.duration = len(self.audio_data) / self.samplerate
             
@@ -58,8 +71,9 @@ class AudioPlayer:
             self.point_b = None
             self.tempo_percent = 100
             self.processed_audio = None
+            self.tempo_controller.clear_cache()
             
-            print(f"Ã¢Å“â€œ Cargado: {self.duration:.1f}s @ {self.samplerate}Hz")
+            print(f"✓ Cargado: {self.duration:.1f}s @ {self.samplerate}Hz")
             
             if self.on_state_change:
                 self.on_state_change("Archivo cargado")
@@ -70,18 +84,18 @@ class AudioPlayer:
             print(f"Error al cargar {filepath}: {e}")
             return False
     
-    # ========== REPRODUCCIÃƒâ€œN ==========
+    # ========== REPRODUCCIÓN ==========
     
     def play(self):
-        """Inicia o resume la reproducciÃƒÂ³n"""
+        """Inicia o resume la reproducción"""
         if self.audio_data is None:
-            print("Ã¢Å¡Â  No hay archivo cargado")
+            print("⚠ No hay archivo cargado")
             return
         
         if self.is_playing:
             return
         
-        # Ã¢Â­Â Solo resetear posiciÃƒÂ³n si NO estamos resumiendo desde pausa
+        # ⭐ Solo resetear posición si NO estamos resumiendo desde pausa
         if not self.is_paused:
             self.current_position = 0.0
         
@@ -90,7 +104,7 @@ class AudioPlayer:
         self.stop_event.clear()
         self.pause_event.clear()
         
-        # Lanzar thread de reproducciÃƒÂ³n
+        # Lanzar thread de reproducción
         self.playback_thread = threading.Thread(target=self._playback_worker, daemon=True)
         self.playback_thread.start()
         
@@ -98,7 +112,7 @@ class AudioPlayer:
             self.on_state_change("Reproduciendo")
     
     def pause(self):
-        """Pausa la reproducciÃƒÂ³n"""
+        """Pausa la reproducción"""
         if not self.is_playing or self.is_paused:
             return
         
@@ -110,14 +124,14 @@ class AudioPlayer:
             self.on_state_change("Pausado")
     
     def resume(self):
-        """Resume despuÃƒÂ©s de pausa"""
+        """Resume después de pausa"""
         if not self.is_paused:
             return
         
         self.is_paused = False
         self.pause_event.clear()
         
-        # Ã¢Â­Â Si el thread muriÃƒÂ³, relanzarlo
+        # ⭐ Si el thread murió, relanzarlo
         if self.playback_thread is None or not self.playback_thread.is_alive():
             self.is_playing = True
             self.stop_event.clear()
@@ -128,7 +142,7 @@ class AudioPlayer:
             self.on_state_change("Reproduciendo")
     
     def stop(self):
-        """Detiene completamente la reproducciÃƒÂ³n"""
+        """Detiene completamente la reproducción"""
         if not self.is_playing:
             return
         
@@ -142,7 +156,7 @@ class AudioPlayer:
         if self.playback_thread and self.playback_thread.is_alive():
             self.playback_thread.join(timeout=1.0)
         
-        # Ã¢Â­Â Resetear posiciÃƒÂ³n al detener
+        # ⭐ Resetear posición al detener
         self.current_position = 0.0
         
         if self.on_state_change:
@@ -157,16 +171,194 @@ class AudioPlayer:
         else:
             self.play()
     
+    # ========== PLAYBACK WORKER ==========
+    
+    def _playback_worker(self):
+        """Thread de reproducción (loop infinito)"""
+        try:
+            while not self.stop_event.is_set():
+                # Determinar qué reproducir
+                if self.point_a is not None and self.point_b is not None:
+                    # Modo loop A-B
+                    self._play_section(self.point_a, self.point_b)
+                else:
+                    # Reproducción normal
+                    self._play_section(0, self.duration)
+                
+                # Si no estamos en loop, terminar
+                if self.point_a is None or self.point_b is None:
+                    break
+        
+        except Exception as e:
+            print(f"Error en playback: {e}")
+        
+        finally:
+            sd.stop()
+            self.is_playing = False
+    
+    def _play_section(self, start_time, end_time):
+        """Reproduce una sección específica del audio"""
+        # ⭐ Si current_position está entre start_time y end_time, resumir desde ahí
+        if start_time < self.current_position < end_time:
+            actual_start = self.current_position
+        else:
+            actual_start = start_time
+            self.current_position = start_time
+        
+        # Elegir qué audio usar (original o procesado)
+        audio_to_play = self.processed_audio if self.processed_audio is not None else self.audio_data
+        
+        # Convertir tiempos a samples
+        start_sample = int(actual_start * self.samplerate)
+        end_sample = int(end_time * self.samplerate)
+        
+        # Ajustar índices si el audio procesado tiene diferente longitud
+        if self.processed_audio is not None:
+            # Calcular ratio de tiempo
+            original_duration = len(self.audio_data) / self.samplerate
+            processed_duration = len(self.processed_audio) / self.samplerate
+            time_ratio = processed_duration / original_duration
+            
+            # Ajustar samples
+            start_sample = int(start_sample * time_ratio)
+            end_sample = int(end_sample * time_ratio)
+        
+        # Extraer sección
+        section = audio_to_play[start_sample:end_sample]
+        
+        # Reproducir
+        playback_start_time = time.perf_counter()
+        sd.play(section, self.samplerate)
+        time.sleep(0.01)  # ⭐ Pequeño delay para que el stream se inicialice
+        
+        # Actualizar posición mientras reproduce
+        while sd.get_stream().active and not self.stop_event.is_set():
+            # Manejar pausa
+            if self.pause_event.is_set():
+                sd.stop()
+                # Esperar a que se quite la pausa
+                while self.pause_event.is_set() and not self.stop_event.is_set():
+                    time.sleep(0.05)
+                # Reanudar desde donde estábamos
+                if not self.stop_event.is_set():
+                    remaining_start = int(self.current_position * self.samplerate)
+                    if self.processed_audio is not None:
+                        time_ratio = (len(self.processed_audio) / self.samplerate) / (len(self.audio_data) / self.samplerate)
+                        remaining_start = int(remaining_start * time_ratio)
+                    remaining_section = audio_to_play[remaining_start:end_sample]
+                    playback_start_time = time.perf_counter()
+                    sd.play(remaining_section, self.samplerate)
+                    time.sleep(0.01)
+            
+            # Actualizar posición
+            if sd.get_stream().active:
+                elapsed = time.perf_counter() - playback_start_time
+                self.current_position = actual_start + elapsed
+            
+            time.sleep(0.05)
+        
+        sd.wait()
+    
+    # ========== TEMPO ==========
+    
+    def change_tempo(self, delta_percent):
+        """
+        Cambia el tempo en ±delta_percent
+        
+        Args:
+            delta_percent: cambio en porcentaje (ej: -1, +1)
+        """
+        if self.audio_data is None:
+            return
+        
+        # Calcular nuevo tempo
+        new_tempo = self.tempo_percent + delta_percent
+        new_tempo = max(50, min(200, new_tempo))  # Limitar 50-200%
+        
+        if new_tempo == self.tempo_percent:
+            return
+        
+        self.tempo_percent = new_tempo
+        print(f"Tempo: {self.tempo_percent}%")
+        
+        # ⭐ NUEVA LÓGICA: pausar si está reproduciendo
+        was_playing = self.is_playing and not self.is_paused
+        if was_playing:
+            self.pause()
+        
+        # Procesar en thread separado para no bloquear
+        if self.tempo_thread and self.tempo_thread.is_alive():
+            print("⚠ Ya hay un procesamiento en curso")
+            return
+        
+        self.tempo_thread = threading.Thread(
+            target=self._process_tempo_async, 
+            args=(new_tempo,),
+            daemon=True
+        )
+        self.tempo_thread.start()
+    
+    def _process_tempo_async(self, tempo_percent):
+        """Procesa el tempo en un thread separado"""
+        self.is_processing_tempo = True
+        
+        # Callback de progreso
+        def progress_callback(message):
+            if self.on_state_change:
+                self.on_state_change(message)
+        
+        try:
+            # Procesar audio completo (o sección A-B si está definida)
+            if self.point_a is not None and self.point_b is not None:
+                # Procesar solo sección A-B
+                start_sample = int(self.point_a * self.samplerate)
+                end_sample = int(self.point_b * self.samplerate)
+                section = self.audio_data[start_sample:end_sample]
+                
+                processed_section = self.tempo_controller.change_tempo(
+                    section, 
+                    self.samplerate, 
+                    tempo_percent,
+                    on_progress=progress_callback
+                )
+                
+                # Reconstruir audio completo con sección procesada
+                self.processed_audio = np.concatenate([
+                    self.audio_data[:start_sample],
+                    processed_section,
+                    self.audio_data[end_sample:]
+                ])
+            else:
+                # Procesar todo el archivo
+                self.processed_audio = self.tempo_controller.change_tempo(
+                    self.audio_data, 
+                    self.samplerate, 
+                    tempo_percent,
+                    on_progress=progress_callback
+                )
+            
+            # Actualizar duración si cambió
+            if self.processed_audio is not None:
+                self.duration = len(self.processed_audio) / self.samplerate
+            
+        except Exception as e:
+            print(f"Error procesando tempo: {e}")
+            if self.on_state_change:
+                self.on_state_change(f"Error: {e}")
+        
+        finally:
+            self.is_processing_tempo = False
+    
     # ========== LOOP A-B ==========
     
     def set_point_a(self):
-        """Marca el punto A en la posiciÃƒÂ³n actual"""
+        """Marca el punto A en la posición actual"""
         if self.audio_data is None:
             return
         
         self.point_a = self.current_position
         
-        # Si B estÃƒÂ¡ antes de A, lo quitamos
+        # Si B está antes de A, lo quitamos
         if self.point_b is not None and self.point_b < self.point_a:
             self.point_b = None
         
@@ -184,13 +376,13 @@ class AudioPlayer:
             self.on_state_change("Punto A desmarcado")
     
     def set_point_b(self):
-        """Marca el punto B en la posiciÃƒÂ³n actual"""
+        """Marca el punto B en la posición actual"""
         if self.audio_data is None:
             return
         
         self.point_b = self.current_position
         
-        # Si A estÃƒÂ¡ despuÃƒÂ©s de B, lo quitamos
+        # Si A está después de B, lo quitamos
         if self.point_a is not None and self.point_a > self.point_b:
             self.point_a = None
         
@@ -208,14 +400,14 @@ class AudioPlayer:
             self.on_state_change("Punto B desmarcado")
     
     def toggle_point_a(self):
-        """Marca/desmarca punto A segÃƒÂºn estado"""
+        """Marca/desmarca punto A según estado"""
         if self.point_a is None:
             self.set_point_a()
         else:
             self.clear_point_a()
     
     def toggle_point_b(self):
-        """Marca/desmarca punto B segÃƒÂºn estado"""
+        """Marca/desmarca punto B según estado"""
         if self.point_b is None:
             self.set_point_b()
         else:
@@ -226,17 +418,19 @@ class AudioPlayer:
     def start_adjusting_a(self):
         """Entra en modo ajuste de punto A"""
         if self.point_a is None:
-            print("Ã¢Å¡Â  Primero marca el punto A")
+            print("⚠ Primero marca el punto A")
             return
         
         self.adjusting_point = 'A'
         self.pause()
-        print("Modo ajuste punto A (Ã‚Â±0.1s)")
+        
+        if self.on_state_change:
+            self.on_state_change("Ajustando punto A")
     
     def start_adjusting_b(self):
         """Entra en modo ajuste de punto B"""
         if self.point_b is None:
-            print("Ã¢Å¡Â  Primero marca el punto B")
+            print("⚠ Primero marca el punto B")
             return
         
         self.adjusting_point = 'B'
@@ -250,146 +444,42 @@ class AudioPlayer:
             return
         
         self.adjusting_point = 'POSITION'
-        print("Modo ajuste posiciÃƒÂ³n (Ã‚Â±0.1s)")
-        
+        print("Modo ajuste posiciÃƒÂ³n (Ã‚Â±0.1s)")  
+      
         if self.on_state_change:
-            self.on_state_change("Ajustando posiciÃƒÂ³n")
+            self.on_state_change("Ajustando punto B")
     
-    def adjust_fine(self, delta):
-        """
-        Ajusta el punto activo en Ã‚Â±delta segundos
-        delta: tÃƒÂ­picamente Ã‚Â±0.1
-        """
+    def adjust_point(self, delta_seconds):
+        """Ajusta el punto activo en ±delta_seconds"""
         if self.adjusting_point == 'A' and self.point_a is not None:
-            self.point_a = max(0, min(self.duration, self.point_a + delta))
-            print(f"Punto A ajustado: {self.point_a:.3f}s")
+            self.point_a += delta_seconds
+            self.point_a = max(0, min(self.duration, self.point_a))
             
+            if self.on_state_change:
+                self.on_state_change(f"A: {self.point_a:.3f}s")
+        
         elif self.adjusting_point == 'B' and self.point_b is not None:
-            self.point_b = max(0, min(self.duration, self.point_b + delta))
-            print(f"Punto B ajustado: {self.point_b:.3f}s")
+            self.point_b += delta_seconds
+            self.point_b = max(0, min(self.duration, self.point_b))
             
-        elif self.adjusting_point == 'POSITION':
-            self.current_position = max(0, min(self.duration, self.current_position + delta))
-            print(f"PosiciÃƒÂ³n ajustada: {self.current_position:.3f}s")
+            if self.on_state_change:
+                self.on_state_change(f"B: {self.point_b:.3f}s")
     
-    def finish_adjusting(self):
+    def stop_adjusting(self):
         """Sale del modo ajuste"""
         was_position = (self.adjusting_point == 'POSITION')
         self.adjusting_point = None
         
-        # Solo resumir automÃƒÂ¡ticamente si no estÃƒÂ¡bamos ajustando posiciÃƒÂ³n
-        # (para posiciÃƒÂ³n, el usuario debe pulsar play cuando estÃƒÂ© listo)
-        if not was_position:
-            self.resume()
-    
-    # ========== TEMPO ==========
-    
-    def change_tempo(self, delta_percent):
-        """
-        Cambia el tempo en Ã‚Â±delta_percent
-        delta_percent: tÃƒÂ­picamente Ã‚Â±1
-        """
-        old_tempo = self.tempo_percent
-        self.tempo_percent = max(50, min(200, self.tempo_percent + delta_percent))
-        
-        if old_tempo != self.tempo_percent:
-            print(f"Tempo: {self.tempo_percent}%")
-            
-            # Si estÃƒÂ¡ reproduciendo, hay que reprocesar
-            if self.is_playing:
-                self._apply_tempo_to_section()
-            
-            if self.on_state_change:
-                self.on_state_change(f"Tempo: {self.tempo_percent}%")
-    
-    def _apply_tempo_to_section(self):
-        """
-        Aplica time-stretching a la secciÃƒÂ³n actual
-        TODO: Implementar con pyrubberband en siguiente paso
-        """
-        # Por ahora solo placeholder
-        # En el siguiente archivo implementaremos tempo_controller.py
-        pass
-    
-    # ========== PLAYBACK WORKER ==========
-    
-    def _playback_worker(self):
-        """Thread de reproducciÃƒÂ³n (loop infinito)"""
-        try:
-            while not self.stop_event.is_set():
-                # Determinar quÃƒÂ© reproducir
-                if self.point_a is not None and self.point_b is not None:
-                    # Modo loop A-B
-                    self._play_section(self.point_a, self.point_b)
-                else:
-                    # ReproducciÃƒÂ³n normal
-                    self._play_section(0, self.duration)
-                
-                # Si no estamos en loop, terminar
-                if self.point_a is None or self.point_b is None:
-                    break
-        
-        except Exception as e:
-            print(f"Error en playback: {e}")
-        
-        finally:
-            sd.stop()
-            self.is_playing = False
-    
-    def _play_section(self, start_time, end_time):
-        """Reproduce una secciÃƒÂ³n especÃƒÂ­fica del audio"""
-        # Ã¢Â­Â Si current_position estÃƒÂ¡ entre start_time y end_time, resumir desde ahÃƒÂ­
-        # (esto pasa cuando se hace resume despuÃƒÂ©s de pause)
-        if start_time < self.current_position < end_time:
-            actual_start = self.current_position
-        else:
-            actual_start = start_time
-            self.current_position = start_time
-        
-        # Convertir tiempos a samples
-        start_sample = int(actual_start * self.samplerate)
-        end_sample = int(end_time * self.samplerate)
-        
-        # Extraer secciÃƒÂ³n
-        section = self.audio_data[start_sample:end_sample]
-        
-        # TODO: Aplicar tempo si es necesario
-        
-        # Reproducir
-        playback_start_time = time.perf_counter()  # Ã¢Â­Â Timestamp de inicio
-        sd.play(section, self.samplerate, device=0)
-        time.sleep(0.01)  # Ã¢Â­Â PequeÃƒÂ±o delay para que el stream se inicialice
-        
-        # Actualizar posiciÃƒÂ³n mientras reproduce
-        while sd.get_stream().active and not self.stop_event.is_set():
-            # Manejar pausa
-            if self.pause_event.is_set():
-                sd.stop()
-                # Esperar a que se quite la pausa
-                while self.pause_event.is_set() and not self.stop_event.is_set():
-                    time.sleep(0.05)
-                # Reanudar desde donde estÃƒÂ¡bamos
-                if not self.stop_event.is_set():
-                    remaining_start = int(self.current_position * self.samplerate)
-                    remaining_section = self.audio_data[remaining_start:end_sample]
-                    playback_start_time = time.perf_counter()  # Ã¢Â­Â Reset timestamp
-                    sd.play(remaining_section, self.samplerate, device=0)
-                    time.sleep(0.01)  # Ã¢Â­Â Delay para inicializaciÃƒÂ³n del stream
-            
-            # Actualizar posiciÃƒÂ³n usando perf_counter en vez de sd.get_stream().time
-            if sd.get_stream().active:
-                elapsed = time.perf_counter() - playback_start_time  # Ã¢Â­Â Calcular elapsed
-                self.current_position = actual_start + elapsed
-            
-            time.sleep(0.05)
-        
-        sd.wait()
+        if self.on_state_change:
+            self.on_state_change("Ajuste finalizado")
     
     # ========== GETTERS ==========
     
     def get_state(self):
-        """Retorna 'PLAYING', 'PAUSED', o 'STOPPED'"""
-        if self.is_playing and not self.is_paused:
+        """Retorna 'PLAYING', 'PAUSED', 'PROCESSING', o 'STOPPED'"""
+        if self.is_processing_tempo:
+            return 'PROCESSING'
+        elif self.is_playing and not self.is_paused:
             return 'PLAYING'
         elif self.is_paused:
             return 'PAUSED'
@@ -397,13 +487,21 @@ class AudioPlayer:
             return 'STOPPED'
     
     def get_duration(self):
-        """Retorna duraciÃƒÂ³n total del archivo"""
+        """Retorna duración total del archivo"""
         return self.duration
     
     def get_current_time(self):
-        """Retorna posiciÃƒÂ³n actual en segundos"""
+        """Retorna posición actual en segundos"""
         return self.current_position
     
+    def get_tempo_percent(self):
+        """Retorna tempo actual en porcentaje"""
+        return self.tempo_percent
+    
+    def is_tempo_available(self):
+        """Retorna True si tempo control está disponible"""
+        return self.tempo_controller.is_available()
+
     def save_loop(self, output_dir="audio_files"):
         """
         Guarda la secciÃƒÂ³n A-B como nuevo archivo WAV
