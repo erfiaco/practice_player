@@ -15,6 +15,9 @@ from audio_player import AudioPlayer
 from buttons_manager import ButtonsManager
 from oled_display import OledDisplay
 
+import faulthandler, signal
+faulthandler.register(signal.SIGUSR1)
+
 class PracticePlayer:
     def __init__(self):
         self.exit_event = Event()
@@ -209,7 +212,7 @@ class PracticePlayer:
         if filename:
             # Éxito - mostrar mensaje
             self.display.show_message(f"Saved: {filename}")
-            time.sleep(3)
+            time.sleep(2)
             
             # Refrescar browser para que aparezca el nuevo archivo
             self.browser.refresh()
@@ -218,7 +221,7 @@ class PracticePlayer:
         else:
             # Error
             self.display.show_message("Error: Check A-B points")
-            time.sleep(3)
+            time.sleep(2)
         
         # Volver a mostrar player UI
         self._update_ui()
