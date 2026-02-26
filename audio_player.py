@@ -388,23 +388,28 @@ class AudioPlayer:
             with self.sd_lock:
                 sd.stop()
             self.is_playing = False
-    
+
     def _play_section(self, start_time, end_time):
-        """Reproduce una secciÃƒÂ³n especÃƒÂ­fica del audio"""
-        # Ã¢Â­Â Si current_position estÃƒÂ¡ entre start_time y end_time, resumir desde ahÃƒÂ­
-        # (esto pasa cuando se hace resume despuÃƒÂ©s de pause)
+        """Reproduce una sección específica del audio"""
+        # ⭐ Si current_position está entre start_time y end_time, resumir desde ahí
         if start_time < self.current_position < end_time:
             actual_start = self.current_position
         else:
             actual_start = start_time
             self.current_position = start_time
-        
+    
+        # ⭐ ELEGIR QUÉ AUDIO USAR
+        if self.processed_audio is not None:
+            audio_to_play = self.processed_audio
+        else:
+            audio_to_play = self.audio_data
+    
         # Convertir tiempos a samples
         start_sample = int(actual_start * self.samplerate)
         end_sample = int(end_time * self.samplerate)
-        
-        # Extraer secciÃƒÂ³n
-        section = self.audio_data[start_sample:end_sample]
+    
+        # Extraer sección
+        section = audio_to_play[start_sample:end_sample]  # ⭐ Usar audio_to_play    
         
         # TODO: Aplicar tempo si es necesario
         

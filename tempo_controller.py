@@ -55,9 +55,9 @@ class TempoController:
             return self.cache[tempo_percent]
         
         # Calcular time_stretch_ratio
-        # ratio > 1 = más lento (más tiempo)
-        # ratio < 1 = más rápido (menos tiempo)
-        time_ratio = 100.0 / tempo_percent
+        # ratio < 1 = más lento (más tiempo)
+        # ratio > 1 = más rápido (menos tiempo)
+        time_ratio = tempo_percent / 100.0 
         
         if on_progress:
             on_progress(f"Processing {tempo_percent}%...")
