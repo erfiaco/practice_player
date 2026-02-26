@@ -59,11 +59,16 @@ class TempoController:
         # ratio > 1 = más rápido (menos tiempo)
         time_ratio = tempo_percent / 100.0 
         
+        # Estimar tiempo de procesamiento
+        audio_duration = len(audio_data) / samplerate
+        estimated_time = int(audio_duration * 0.15)  # ~15% del tiempo del audio
+        estimated_time = max(2, min(estimated_time, 15))  # Entre 2-15 segundos
+        
         if on_progress:
-            on_progress(f"Processing {tempo_percent}%...")
+            on_progress(f"Procesando\n{estimated_time}-{estimated_time+3}seg")
         
         print(f"Procesando tempo: {tempo_percent}% (ratio={time_ratio:.2f})...")
-        print("⚠ Esto puede tardar 5-10 segundos...")
+        print(f"⚠ Esto puede tardar {estimated_time}-{estimated_time+3} segundos...")
         
         try:
             # pyrubberband.time_stretch(audio, samplerate, rate)
