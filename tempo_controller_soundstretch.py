@@ -76,8 +76,13 @@ class TempoController:
         
         if on_progress:
             on_progress(f"Processing {tempo_percent}%...")
-        print(f"Procesando tempo: {tempo_percent}% (cambio={tempo_change:+d}%)...")
         
+        print(f"Procesando tempo: {tempo_percent}% (cambio={tempo_change:+d}%)...")
+
+        if on_progress:
+            on_progress(f"Processing {tempo_percent}%...")
+        return processed
+                
         # Crear archivos temporales
         with tempfile.TemporaryDirectory() as tmpdir:
             input_wav = os.path.join(tmpdir, "input.wav")

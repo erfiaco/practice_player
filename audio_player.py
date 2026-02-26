@@ -3,6 +3,7 @@ import soundfile as sf
 import numpy as np
 import threading
 import time
+from tempo_controller import TempoController
 sd.default.device = 0  # AudioInjector (hw:1,0)
 
 class AudioPlayer:
@@ -28,6 +29,7 @@ class AudioPlayer:
         
         # Tempo
         self.tempo_percent = 100  # 100% = velocidad normal
+        self.tempo_controller = TempoController()  # ⭐ AÑADIR ESTA LÍNEA
         self.processed_audio = None  # Audio con tempo aplicado
         
         # Threading
@@ -73,6 +75,7 @@ class AudioPlayer:
             return False
     
     # ========== REPRODUCCIÃƒâ€œN ==========
+   
     
     def play(self):
         """Inicia o resume la reproducciÃƒÂ³n"""
@@ -82,6 +85,17 @@ class AudioPlayer:
         
         if self.is_playing:
             return
+            
+    
+        # Si el tempo cambió y no está en cache, procesar antes de reproducir
+        if self.tempo_percent != 100:
+            if self.tempo_percent not in self.tempo_controller.cache:
+                if self.on_state_change:
+                    self.on_state_change(f"Processing {self.tempo_percent}%...")
+                self._process_tempo_sync()
+        elif self.tempo_percent == 100:
+            # Si volvemos a 100%, usar audio original
+            self.processed_audio = None
         
         # Ã¢Â­Â Solo resetear posiciÃƒÂ³n si NO estamos resumiendo desde pausa
         if not self.is_paused:
@@ -160,6 +174,36 @@ class AudioPlayer:
             self.resume()
         else:
             self.play()
+
+
+    # ========== TEMPO PROCESSING ==========
+    
+    def _process_tempo_sync(self):
+        """
+        Procesa tempo de forma síncrona (bloquea hasta terminar)
+        Se llama desde play() cuando es necesario
+        """
+        def progress_callback(message):
+            if self.on_state_change:
+                self.on_state_change(message)
+        
+        try:
+            # Procesar audio completo
+            self.processed_audio = self.tempo_controller.change_tempo(
+                self.audio_data,
+                self.samplerate,
+                self.tempo_percent,
+                on_progress=progress_callback
+            )
+            
+        except Exception as e:
+            print(f"Error procesando tempo: {e}")
+            if self.on_state_change:
+                self.on_state_change(f"Error: {e}")
+            self.processed_audio = None
+
+
+
     
     # ========== LOOP A-B ==========
     
@@ -290,22 +334,26 @@ class AudioPlayer:
     
     def change_tempo(self, delta_percent):
         """
-        Cambia el tempo en Ã‚Â±delta_percent
-        delta_percent: tÃƒÂ­picamente Ã‚Â±1
+        Cambia el tempo en ±delta_percent (solo actualiza el número)
+        El procesamiento ocurre cuando se presiona play()
         """
-        old_tempo = self.tempo_percent
-        self.tempo_percent = max(50, min(200, self.tempo_percent + delta_percent))
-        
-        if old_tempo != self.tempo_percent:
-            print(f"Tempo: {self.tempo_percent}%")
-            
-            # Si estÃƒÂ¡ reproduciendo, hay que reprocesar
-            if self.is_playing:
-                self._apply_tempo_to_section()
-            
-            if self.on_state_change:
-                self.on_state_change(f"Tempo: {self.tempo_percent}%")
+        if self.audio_data is None:
+            return
     
+        # Calcular nuevo tempo
+        new_tempo = self.tempo_percent + delta_percent
+        new_tempo = max(50, min(200, new_tempo))  # Limitar 50-200%
+    
+        if new_tempo == self.tempo_percent:
+            return
+    
+        self.tempo_percent = new_tempo
+        print(f"Tempo: {self.tempo_percent}%")
+    
+        if self.on_state_change:
+            self.on_state_change(f"Tempo: {self.tempo_percent}%")    
+
+
     def _apply_tempo_to_section(self):
         """
         Aplica time-stretching a la secciÃƒÂ³n actual

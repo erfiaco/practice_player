@@ -1,5 +1,8 @@
 """
-Tempo Controller - Time-stretching con pyrubberband (versión asíncrona)
+Tempo Controller - Time-stretching con Rubber Band Library
+
+Este módulo maneja el cambio de tempo sin alterar el pitch.
+Usa pyrubberband como wrapper de la Rubber Band Library (C++).
 """
 
 import numpy as np
@@ -13,44 +16,35 @@ except ImportError:
 
 class TempoController:
     """
-    Controlador de tempo con cache y procesamiento asíncrono
+    Controlador de tempo con cache de versiones procesadas
     """
     
     def __init__(self):
         self.cache = {}  # {tempo_percent: processed_audio}
-        self.cache_limit = 10  # Máximo de versiones en cache
+        self.cache_limit = 5  # Máximo de versiones en cache
         
-    def change_tempo(self, audio_data, samplerate, tempo_percent, on_progress=None):
+    def change_tempo(self, audio_data, samplerate, tempo_percent):
         """
         Cambia el tempo del audio sin alterar el pitch
-        
-        IMPORTANTE: Este proceso NO es en tiempo real - puede tardar varios segundos
         
         Args:
             audio_data: numpy array del audio
             samplerate: sample rate del audio
             tempo_percent: porcentaje de tempo (100 = normal, 50 = mitad, 200 = doble)
-            on_progress: callback opcional(message) para reportar progreso
         
         Returns:
             numpy array con audio procesado
         """
         if not RUBBERBAND_AVAILABLE:
-            if on_progress:
-                on_progress("⚠ pyrubberband no disponible")
             print("⚠ Rubber Band no disponible, retornando audio original")
             return audio_data
         
         # Si es 100%, no hacer nada
         if tempo_percent == 100:
-            if on_progress:
-                on_progress("Tempo 100% (sin cambios)")
             return audio_data
         
         # Revisar cache
         if tempo_percent in self.cache:
-            if on_progress:
-                on_progress(f"✓ Usando cache ({tempo_percent}%)")
             print(f"✓ Usando audio cacheado ({tempo_percent}%)")
             return self.cache[tempo_percent]
         
@@ -59,11 +53,7 @@ class TempoController:
         # ratio < 1 = más rápido (menos tiempo)
         time_ratio = 100.0 / tempo_percent
         
-        if on_progress:
-            on_progress(f"Processing {tempo_percent}%...")
-        
         print(f"Procesando tempo: {tempo_percent}% (ratio={time_ratio:.2f})...")
-        print("⚠ Esto puede tardar 5-10 segundos...")
         
         try:
             # pyrubberband.time_stretch(audio, samplerate, rate)
@@ -71,26 +61,20 @@ class TempoController:
             # rate < 1 = más rápido
             processed = pyrb.time_stretch(audio_data, samplerate, time_ratio)
             
-            # Guardar en cache (FIFO si está lleno)
-            if len(self.cache) >= self.cache_limit:
+            # Guardar en cache (si hay espacio)
+            if len(self.cache) < self.cache_limit:
+                self.cache[tempo_percent] = processed
+            else:
+                # Eliminar el más antiguo (simple FIFO)
                 oldest_key = list(self.cache.keys())[0]
                 del self.cache[oldest_key]
+                self.cache[tempo_percent] = processed
             
-            self.cache[tempo_percent] = processed
-            
-            duration_in = len(audio_data) / samplerate
-            duration_out = len(processed) / samplerate
-            print(f"✓ Tempo procesado: {duration_in:.1f}s → {duration_out:.1f}s")
-            
-            if on_progress:
-                on_progress(f"✓ Ready at {tempo_percent}%")
-            
+            print(f"✓ Tempo procesado: {len(processed)/samplerate:.1f}s")
             return processed
             
         except Exception as e:
             print(f"Error en time-stretching: {e}")
-            if on_progress:
-                on_progress(f"✗ Error: {e}")
             return audio_data
     
     def clear_cache(self):
@@ -105,7 +89,46 @@ class TempoController:
             'count': len(self.cache),
             'limit': self.cache_limit
         }
+
+# Función helper para uso directo
+def apply_tempo(audio, samplerate, tempo_percent):
+    """
+    Función helper para aplicar tempo sin mantener cache
+    """
+    controller = TempoController()
+    return controller.change_tempo(audio, samplerate, tempo_percent)
+
+
+# === TESTING ===
+if __name__ == "__main__":
+    print("=== Tempo Controller Test ===")
+    print(f"Rubber Band disponible: {RUBBERBAND_AVAILABLE}")
     
-    def is_available(self):
-        """Retorna True si pyrubberband está disponible"""
-        return RUBBERBAND_AVAILABLE
+    if RUBBERBAND_AVAILABLE:
+        # Crear audio de prueba (1 segundo de tono)
+        import numpy as np
+        samplerate = 44100
+        duration = 1.0
+        freq = 440  # La4
+        
+        t = np.linspace(0, duration, int(samplerate * duration))
+        audio = np.sin(2 * np.pi * freq * t).astype(np.float32)
+        
+        controller = TempoController()
+        
+        # Test: 50% (mitad de velocidad)
+        print("\nTest 1: 50% tempo (más lento)")
+        slow = controller.change_tempo(audio, samplerate, 50)
+        print(f"Original: {len(audio)/samplerate:.2f}s → Procesado: {len(slow)/samplerate:.2f}s")
+        
+        # Test: 200% (doble velocidad)
+        print("\nTest 2: 200% tempo (más rápido)")
+        fast = controller.change_tempo(audio, samplerate, 200)
+        print(f"Original: {len(audio)/samplerate:.2f}s → Procesado: {len(fast)/samplerate:.2f}s")
+        
+        # Info de cache
+        print(f"\nCache info: {controller.get_cache_info()}")
+    else:
+        print("\nPara habilitar tempo control, instala:")
+        print("  sudo apt-get install rubberband-cli librubberband-dev")
+        print("  pip3 install pyrubberband")
