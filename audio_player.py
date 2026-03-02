@@ -96,6 +96,8 @@ class AudioPlayer:
         elif self.tempo_percent == 100:
             # Si volvemos a 100%, usar audio original
             self.processed_audio = None
+            # ⭐ RESTAURAR DURACIÓN ORIGINAL
+            self.duration = len(self.audio_data) / self.samplerate
         
         # Ã¢Â­Â Solo resetear posiciÃƒÂ³n si NO estamos resumiendo desde pausa
         if not self.is_paused:
@@ -195,6 +197,11 @@ class AudioPlayer:
                 self.tempo_percent,
                 on_progress=progress_callback
             )
+            
+
+            if self.processed_audio is not None:
+                # Actualizar duración para reflejar el audio procesado
+                self.duration = len(self.processed_audio) / self.samplerate
             
         except Exception as e:
             print(f"Error procesando tempo: {e}")
@@ -401,12 +408,19 @@ class AudioPlayer:
         # ⭐ ELEGIR QUÉ AUDIO USAR
         if self.processed_audio is not None:
             audio_to_play = self.processed_audio
+        
+            # ⭐ CALCULAR RATIO DE ESCALA
+            original_duration = len(self.audio_data) / self.samplerate
+            processed_duration = len(self.processed_audio) / self.samplerate
+            time_scale = processed_duration / original_duration
+        
         else:
             audio_to_play = self.audio_data
     
-        # Convertir tiempos a samples
-        start_sample = int(actual_start * self.samplerate)
-        end_sample = int(end_time * self.samplerate)
+        # Convertir tiempos a samples (escalados si es audio procesado)
+   
+        start_sample = int(actual_start * self.samplerate * time_scale)
+        end_sample = int(end_time * self.samplerate * time_scale)
     
         # Extraer sección
         section = audio_to_play[start_sample:end_sample]  # ⭐ Usar audio_to_play    
