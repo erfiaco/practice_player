@@ -55,6 +55,7 @@ class AudioPlayer:
             self.audio_data, self.samplerate = sf.read(filepath)
             self.filepath = filepath
             self.duration = len(self.audio_data) / self.samplerate
+            self.original_duration = self.duration
             
             # Reset de estado
             self.current_position = 0.0
@@ -97,7 +98,7 @@ class AudioPlayer:
             # Si volvemos a 100%, usar audio original
             self.processed_audio = None
             # ⭐ RESTAURAR DURACIÓN ORIGINAL
-            self.duration = len(self.audio_data) / self.samplerate
+            #self.duration = len(self.audio_data) / self.samplerate
         
         # Ã¢Â­Â Solo resetear posiciÃƒÂ³n si NO estamos resumiendo desde pausa
         if not self.is_paused:
@@ -124,6 +125,8 @@ class AudioPlayer:
         self.pause_event.set()
         with self.sd_lock:
             sd.stop()
+            
+        time.sleep(0.05)
         
         if self.on_state_change:
             self.on_state_change("Pausado")
@@ -161,6 +164,7 @@ class AudioPlayer:
         # Esperar a que termine el thread
         if self.playback_thread and self.playback_thread.is_alive():
             self.playback_thread.join(timeout=1.0)
+        time.sleep(0.1)
         
         # Ã¢Â­Â Resetear posiciÃƒÂ³n al detener
         self.current_position = 0.0
@@ -201,7 +205,8 @@ class AudioPlayer:
 
             if self.processed_audio is not None:
                 # Actualizar duración para reflejar el audio procesado
-                self.duration = len(self.processed_audio) / self.samplerate
+                #self.duration = len(self.processed_audio) / self.samplerate
+            	pass
             
         except Exception as e:
             print(f"Error procesando tempo: {e}")
@@ -315,16 +320,23 @@ class AudioPlayer:
         Ajusta el punto activo en Ã‚Â±delta segundos
         delta: tÃƒÂ­picamente Ã‚Â±0.1
         """
+        # ⭐ Calcular límite máximo (usar duración procesada si existe)
+        if self.processed_audio is not None:
+            max_duration = len(self.processed_audio) / self.samplerate
+        else:
+            max_duration = self.original_duration
+        
+        
         if self.adjusting_point == 'A' and self.point_a is not None:
-            self.point_a = max(0, min(self.duration, self.point_a + delta))
+            self.point_a = max(0, min(max_duration, self.point_a + delta))
             print(f"Punto A ajustado: {self.point_a:.3f}s")
             
         elif self.adjusting_point == 'B' and self.point_b is not None:
-            self.point_b = max(0, min(self.duration, self.point_b + delta))
+            self.point_b = max(0, min(max_duration, self.point_b + delta))
             print(f"Punto B ajustado: {self.point_b:.3f}s")
             
         elif self.adjusting_point == 'POSITION':
-            self.current_position = max(0, min(self.duration, self.current_position + delta))
+            self.current_position = max(0, min(max_duration, self.current_position + delta))
             print(f"PosiciÃƒÂ³n ajustada: {self.current_position:.3f}s")
     
     def finish_adjusting(self):
@@ -381,8 +393,13 @@ class AudioPlayer:
                     # Modo loop A-B
                     self._play_section(self.point_a, self.point_b)
                 else:
-                    # ReproducciÃƒÂ³n normal
-                    self._play_section(0, self.duration)
+                    
+                    
+                    if self.processed_audio is not None:
+                        end_time = len(self.processed_audio) / self.samplerate
+                    else:
+                        end_time = self.duration
+                    self._play_section(0, end_time)
                 
                 # Si no estamos en loop, terminar
                 if self.point_a is None or self.point_b is None:
@@ -398,6 +415,7 @@ class AudioPlayer:
 
     def _play_section(self, start_time, end_time):
         """Reproduce una sección específica del audio"""
+        
         # ⭐ Si current_position está entre start_time y end_time, resumir desde ahí
         if start_time < self.current_position < end_time:
             actual_start = self.current_position
@@ -408,6 +426,7 @@ class AudioPlayer:
         # ⭐ ELEGIR QUÉ AUDIO USAR
         if self.processed_audio is not None:
             audio_to_play = self.processed_audio
+            
         
             # ⭐ CALCULAR RATIO DE ESCALA
             original_duration = len(self.audio_data) / self.samplerate
@@ -416,6 +435,7 @@ class AudioPlayer:
         
         else:
             audio_to_play = self.audio_data
+            time_scale = 1.0
     
         # Convertir tiempos a samples (escalados si es audio procesado)
    
@@ -444,8 +464,9 @@ class AudioPlayer:
                     time.sleep(0.05)
                 # Reanudar desde donde estÃƒÂ¡bamos
                 if not self.stop_event.is_set():
-                    remaining_start = int(self.current_position * self.samplerate)
-                    remaining_section = self.audio_data[remaining_start:end_sample]
+                    remaining_start = int(self.current_position * self.samplerate * time_scale)  # ⭐ escalar
+                    remaining_section = audio_to_play[remaining_start:end_sample]  # ⭐ usar audio_to_play
+                    
                     playback_start_time = time.perf_counter()  # Ã¢Â­Â Reset timestamp
                     with self.sd_lock:
                         sd.play(remaining_section, self.samplerate, device=0)
@@ -458,7 +479,8 @@ class AudioPlayer:
             
             time.sleep(0.05)
         
-        sd.wait()
+        with self.sd_lock:
+            sd.wait()
     
     # ========== GETTERS ==========
     

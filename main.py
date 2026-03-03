@@ -280,6 +280,13 @@ class PracticePlayer:
             # Pantalla normal de player
             state = self.player.get_state()
             current_time = self.player.get_current_time()
+            
+            #Esta opcion estala el tiempo total con el tempo modifier
+            #if self.player.processed_audio is not None:
+            #    total_time = len(self.player.processed_audio) / self.player.samplerate
+            #else:
+            #    total_time = self.player.get_duration()
+            
             total_time = self.player.get_duration()
             
             help_text = "PLAY A B STOP(3s)=Back"
