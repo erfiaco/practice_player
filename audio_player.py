@@ -475,7 +475,9 @@ class AudioPlayer:
             # Actualizar posiciÃƒÂ³n usando perf_counter en vez de sd.get_stream().time
             if sd.get_stream().active:
                 elapsed = time.perf_counter() - playback_start_time  # Ã¢Â­Â Calcular elapsed
-                self.current_position = actual_start + elapsed
+                #convertire el tiempo elapsed de tiempo procesado a tiempo original
+                elapsed_original = elapsed / time_scale
+                self.current_position = actual_start + elapsed_original
             
             time.sleep(0.05)
         
