@@ -88,23 +88,26 @@ class PracticePlayer:
         print("Ã¢â€ â€™ [BROWSER] Archivo siguiente")
         self.browser.next_file()
         self._update_ui()
-    
+        
     def _browser_select(self):
-        """GPIO13 TAP: Seleccionar archivo y pasar a PLAYER"""
-        print("Ã¢â€ â€™ [BROWSER] Seleccionar archivo")
-        
-        if not self.browser.has_files():
-            print("Ã¢Å¡Â  No hay archivos WAV disponibles")
+        """GPIO13 TAP: Seleccionar ítem del browser"""
+        print("→ [BROWSER] Seleccionar")
+
+        if not self.browser.has_items():
+            print("⚠ No hay ítems disponibles")
             return
-        
-        filepath = self.browser.get_current_file()
-        
-        # Cargar archivo
-        if self.player.load_file(filepath):
-            # Cambiar a modo player
-            self._set_player_mode()
-        else:
-            print("Ã¢Å¡Â  Error al cargar archivo")
+
+        action, filepath = self.browser.select()
+
+        if action == 'wav':
+            if self.player.load_file(filepath):
+                self._set_player_mode()
+            else:
+                print("⚠ Error al cargar archivo")
+
+        elif action in ('entered', 'up'):
+            # El browser ya hizo _scan(), solo refrescar UI
+            self._update_ui()    
     
     def _browser_exit(self):
         """GPIO13 HOLD: Salir del programa"""
@@ -262,8 +265,8 @@ class PracticePlayer:
         
         help_text = "SELECT=Load HOLD=Exit"
         
-        self.display.show_browser(filename, pos, total, help_text)
-    
+        self.display.show_browser(filename=self.browser.get_current_item_name(), pos=pos, total=total, help_text=help_text,dir_label=self.browser.get_current_dir_label())
+           
     def _render_player_ui(self):
         """Renderiza UI del player"""
         # Si estamos ajustando un punto, mostrar pantalla especial

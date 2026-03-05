@@ -81,8 +81,8 @@ class OledDisplay:
         """Limpia la pantalla"""
         img = Image.new("1", (self.W, self.H))
         self._safe_display(img)
-    
-    def show_browser(self, filename, position, total, help_text="STOP(3s)=Exit"):
+
+    def show_browser(self, filename, pos, total, help_text="STOP(3s)=Exit", dir_label='/'):
         """
         Muestra el modo BROWSER
         ┌────────────────────────┐
@@ -96,14 +96,14 @@ class OledDisplay:
         d = ImageDraw.Draw(img)
         
         # Línea 1: Modo
-        d.text((0, 0), "BROWSER", font=self.font_big, fill=255)
+        d.text((0, 0), f"BROWSER {dir_label}" if dir_label != '/' else "BROWSER", font=self.font_big, fill=255)
         
         # Línea 2: Nombre de archivo (truncar si es muy largo)
         display_name = filename[:18] if len(filename) > 18 else filename
         d.text((0, 20), f"► {display_name}", font=self.font_med, fill=255)
         
         # Línea 3: Posición
-        d.text((0, 36), f"  {position}/{total} files", font=self.font_small, fill=255)
+        d.text((0, 36), f"  {pos}/{total} files", font=self.font_small, fill=255)
         
         # Línea 4: Ayuda
         d.text((0, 50), help_text, font=self.font_small, fill=255)
