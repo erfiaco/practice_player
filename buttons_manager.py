@@ -27,6 +27,8 @@ class ButtonsManager:
         self.btn_tempo_dn = Button(9, pull_up=True, bounce_time=0.03, hold_time=0.3)
         self.btn_tempo_up = Button(22, pull_up=True, bounce_time=0.03, hold_time=0.3)
         self.btn_save_loop = Button(25, pull_up=True, bounce_time=0.03, hold_time=1.0)
+        self.btn_pitch_dn = Button(17, pull_up=True, bounce_time=0.03, hold_time=0.3)
+        self.btn_pitch_up = Button(27, pull_up=True, bounce_time=0.03, hold_time=0.3)
         
         # Callbacks vacÃƒÂ­os por defecto
         self._callbacks = {
@@ -41,6 +43,8 @@ class ButtonsManager:
             'tempo_down': None,
             'tempo_up': None,
             'save_loop': None,
+            'pitch_down': None,
+            'pitch_up': None,
         }
         
         # Estado para detectar tap vs hold
@@ -53,6 +57,12 @@ class ButtonsManager:
         self._tempo_up_held = False
         self._tempo_hold_start_time = None
         self._tempo_repeat_thread = None
+        
+        # Estado para botones de pitch (igual que tempo)
+        self._pitch_down_held = False
+        self._pitch_up_held = False
+        self._pitch_hold_start_time = None
+        self._pitch_repeat_thread = None
         
         # Asignar handlers
         self._setup_handlers()
@@ -87,6 +97,12 @@ class ButtonsManager:
         
         # Save Loop
         self.btn_save_loop.when_pressed = self._on_save_loop
+        
+        # Pitch down/up — idéntico a tempo
+        self.btn_pitch_dn.when_pressed = self._on_pitch_down_press
+        self.btn_pitch_dn.when_released = self._on_pitch_down_release
+        self.btn_pitch_up.when_pressed = self._on_pitch_up_press
+        self.btn_pitch_up.when_released = self._on_pitch_up_release
         
     # === Play (tap vs hold) ===
     def _on_play_press(self):
@@ -227,11 +243,64 @@ class ButtonsManager:
             # Esperar antes de la siguiente repeticiÃƒÂ³n
             time.sleep(repeat_delay)
     
+    # === Pitch (mismo patrón que tempo) ===
+    def _on_pitch_down_press(self):
+        self._pitch_down_held = True
+        self._pitch_hold_start_time = time.time()
+        if self._callbacks['pitch_down']:
+            self._callbacks['pitch_down']()
+        if self._pitch_repeat_thread is None or not self._pitch_repeat_thread.is_alive():
+            self._pitch_repeat_thread = threading.Thread(
+                target=self._pitch_repeat_worker,
+                args=('down',), daemon=True
+            )
+            self._pitch_repeat_thread.start()
+
+    def _on_pitch_down_release(self):
+        self._pitch_down_held = False
+
+    def _on_pitch_up_press(self):
+        self._pitch_up_held = True
+        self._pitch_hold_start_time = time.time()
+        if self._callbacks['pitch_up']:
+            self._callbacks['pitch_up']()
+        if self._pitch_repeat_thread is None or not self._pitch_repeat_thread.is_alive():
+            self._pitch_repeat_thread = threading.Thread(
+                target=self._pitch_repeat_worker,
+                args=('up',), daemon=True
+            )
+            self._pitch_repeat_thread.start()
+
+    def _on_pitch_up_release(self):
+        self._pitch_up_held = False
+
+    def _pitch_repeat_worker(self, direction):
+        """Repite el cambio de pitch mientras el botón está pulsado.
+        Velocidad progresiva: lento al inicio, más rápido al mantener."""
+        time.sleep(0.4)  # delay inicial un poco mayor que tempo (semitonos son grandes)
+        callback = self._callbacks['pitch_down'] if direction == 'down' else self._callbacks['pitch_up']
+        is_held = lambda: self._pitch_down_held if direction == 'down' else self._pitch_up_held
+        if not callback:
+            return
+        while is_held():
+            elapsed = time.time() - self._pitch_hold_start_time
+            if elapsed < 2.0:
+                repeat_delay = 0.35   # 1 semitono cada 350ms al inicio
+            else:
+                repeat_delay = 0.20   # más rápido si sigues manteniendo
+            callback()
+            time.sleep(repeat_delay)
+            
+            
+    
     # === Save Loop ===
     def _on_save_loop(self):
         """Guarda la secciÃƒÂ³n A-B como nuevo archivo"""
         if self._callbacks['save_loop']:
             self._callbacks['save_loop']()
+            
+            
+            
     
     # === API pÃƒÂºblica para asignar callbacks ===
     def set_callback(self, event, callback):
@@ -261,10 +330,12 @@ class ButtonsManager:
         self.set_callback('tempo_up', on_next)
         self.set_callback('play', on_select)
         self.set_callback('stop_hold', on_exit)
+        self.set_callback('pitch_down', None)   # ← AÑADIR (inactivos en browser)
+        self.set_callback('pitch_up', None) 
     
     def set_player_mode(self, on_play, on_play_hold, on_mark_a_tap, on_mark_a_hold,
                         on_mark_b_tap, on_mark_b_hold, on_stop, on_back,
-                        on_tempo_down, on_tempo_up, on_save_loop):
+                        on_tempo_down, on_tempo_up, on_save_loop, on_pitch_down=None, on_pitch_up=None):
         """
         Configura callbacks para modo PLAYER
         """
@@ -279,6 +350,8 @@ class ButtonsManager:
         self.set_callback('tempo_down', on_tempo_down)
         self.set_callback('tempo_up', on_tempo_up)
         self.set_callback('save_loop', on_save_loop)
+        self.set_callback('pitch_down', on_pitch_down)
+        self.set_callback('pitch_up', on_pitch_up) 
     
     def close(self):
         """Libera recursos GPIO"""
@@ -290,5 +363,7 @@ class ButtonsManager:
             self.btn_tempo_dn.close()
             self.btn_tempo_up.close()
             self.btn_save_loop.close()
+            self.btn_pitch_dn.close()
+            self.btn_pitch_up.close()
         except:
             pass
