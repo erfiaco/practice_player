@@ -111,7 +111,7 @@ class OledDisplay:
         self._safe_display(img)
     
     def show_player(self, state, current_time, total_time, point_a=None, point_b=None, 
-                    tempo=100, pitch=0, help_text="PLAY A B STOP"):
+                    tempo=100, help_text="PLAY A B STOP"):
         """
         Muestra el modo PLAYER
         ┌────────────────────────┐
@@ -124,13 +124,10 @@ class OledDisplay:
         img = Image.new("1", (self.W, self.H))
         d = ImageDraw.Draw(img)
         
-        # Línea 1: Estado, tempo y pitch
+        # Línea 1: Estado y tempo
         state_icon = "▶" if state == "PLAYING" else "⏸" if state == "PAUSED" else "⏹"
         d.text((0, 0), f"{state_icon} {state}", font=self.font_big, fill=255)
         d.text((100, 0), f"{tempo}%", font=self.font_med, fill=255)
-        if pitch != 0:
-            d.text((100, 12), f"{pitch:+d}st", font=self.font_small, fill=255)
-        
         
         # Línea 2: Tiempo
         current_str = self._format_time(current_time)

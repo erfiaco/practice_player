@@ -4,7 +4,29 @@ import numpy as np
 import threading
 import time
 from tempo_controller import TempoController
-sd.default.device = 0  # AudioInjector (hw:1,0)
+def _salida_es_bt():
+    """True si bt_menu dejó ~/.asoundrc apuntando al altavoz Bluetooth"""
+    try:
+        with open('/home/Javo/.asoundrc') as f:
+            return 'generado por bt_menu' in f.read()
+    except FileNotFoundError:
+        return False
+
+def _configurar_salida():
+    """Salida por el default de ALSA (cable, o Bluetooth si bt_menu escribió
+    ~/.asoundrc); si el default no se puede abrir, cae al AudioInjector."""
+    try:
+        sd.check_output_settings(device='default', channels=2)
+        sd.default.device = 'default'
+        if _salida_es_bt():
+            # BT necesita buffer grande o el audio sale entrecortado
+            sd.default.latency = 'high'
+            print("[audio] salida Bluetooth, latency=high")
+    except Exception as e:
+        print(f"[audio] default no disponible ({e}); usando AudioInjector")
+        sd.default.device = 'audioinjector'
+
+_configurar_salida()
 
 class AudioPlayer:
     """
@@ -32,9 +54,6 @@ class AudioPlayer:
         self.tempo_controller = TempoController()  # ⭐ AÑADIR ESTA LÍNEA
         self.processed_audio = None  # Audio con tempo aplicado
         
-        # Pitch
-        self.pitch_semitones = 0
-        
         # Threading
         self.playback_thread = None
         self.stop_event = threading.Event()
@@ -52,7 +71,7 @@ class AudioPlayer:
     def load_file(self, filepath):
         """Carga un archivo WAV en memoria"""
         try:
-            self.stop()  # Detener reproduccion anterior
+            self.stop()  # Detener reproducciÃƒÂ³n anterior
             
             print(f"Cargando: {filepath}")
             self.audio_data, self.samplerate = sf.read(filepath)
@@ -66,7 +85,6 @@ class AudioPlayer:
             self.point_b = None
             self.tempo_percent = 100
             self.processed_audio = None
-            self.pitch_semitones = 0   # reseteamos al cargar archivo
             
             print(f"Ã¢Å“â€œ Cargado: {self.duration:.1f}s @ {self.samplerate}Hz")
             
@@ -385,36 +403,6 @@ class AudioPlayer:
         # Por ahora solo placeholder
         # En el siguiente archivo implementaremos tempo_controller.py
         pass
-
-    # ========== PITCH ==========
-        
-    def change_pitch(self, delta_semitones):
-        """Cambia el pitch en ±1 semitono. Rango: -12..+12"""
-        old = self.pitch_semitones
-        self.pitch_semitones = max(-12, min(12, self.pitch_semitones + delta_semitones))
-        if old != self.pitch_semitones:
-            print(f"Pitch: {self.pitch_semitones:+d}st")
-            if self.on_state_change:
-                self.on_state_change(f"Pitch: {self.pitch_semitones:+d}st")
-
-    def _process_audio(self, audio):
-        """Aplica tempo y/o pitch con pyrubberband antes de reproducir"""
-        try:
-            import pyrubberband as pyrb
-            result = audio.copy()
-            if self.tempo_percent != 100:
-                time_ratio = 100.0 / self.tempo_percent
-                result = pyrb.time_stretch(result, self.samplerate, time_ratio)
-            if self.pitch_semitones != 0:
-                result = pyrb.pitch_shift(result, self.samplerate,
-                                          n_steps=self.pitch_semitones)
-            return result
-        except ImportError:
-            print("⚠ pyrubberband no disponible")
-            return audio
-        except Exception as e:
-            print(f"Error procesando audio: {e}")
-            return audio
     
     # ========== PLAYBACK WORKER ==========
     
@@ -479,14 +467,12 @@ class AudioPlayer:
         # Extraer sección
         section = audio_to_play[start_sample:end_sample]  # ⭐ Usar audio_to_play    
         
-        # Aplicar tempo y/o pitch si es necesario
-        if self.tempo_percent != 100 or self.pitch_semitones != 0:
-            section = self._process_audio(section)
+        # TODO: Aplicar tempo si es necesario
         
         # Reproducir
         playback_start_time = time.perf_counter()  # Ã¢Â­Â Timestamp de inicio
         with self.sd_lock:
-            sd.play(section, self.samplerate, device=0)
+            sd.play(section, self.samplerate)
         time.sleep(0.01)  # Ã¢Â­Â PequeÃƒÂ±o delay para que el stream se inicialice
         
         # Actualizar posiciÃƒÂ³n mientras reproduce
@@ -505,7 +491,7 @@ class AudioPlayer:
                     
                     playback_start_time = time.perf_counter()  # Ã¢Â­Â Reset timestamp
                     with self.sd_lock:
-                        sd.play(remaining_section, self.samplerate, device=0)
+                        sd.play(remaining_section, self.samplerate)
                     time.sleep(0.01)  # Ã¢Â­Â Delay para inicializaciÃƒÂ³n del stream
             
             # Actualizar posiciÃƒÂ³n usando perf_counter en vez de sd.get_stream().time

@@ -70,9 +70,7 @@ class PracticePlayer:
             on_back=self._player_back,
             on_tempo_down=self._player_tempo_down,
             on_tempo_up=self._player_tempo_up,
-            on_save_loop=self._player_save_loop,
-            on_pitch_down=self._player_pitch_down,
-            on_pitch_up=self._player_pitch_up    
+            on_save_loop=self._player_save_loop
         )
         self._update_ui("Modo PLAYER")
         print("Ã¢â€ â€™ Modo PLAYER activado")
@@ -203,18 +201,6 @@ class PracticePlayer:
             self.player.change_tempo(+1)
         
         self._update_ui()
-        
-    def _player_pitch_down(self):
-        """GPIO17: Pitch -1 semitono"""
-        print("→ [PLAYER] Pitch -1st")
-        self.player.change_pitch(-1)
-        self._update_ui()
-
-    def _player_pitch_up(self):
-        """GPIO27: Pitch +1 semitono"""
-        print("→ [PLAYER] Pitch +1st")
-        self.player.change_pitch(+1)
-        self._update_ui()
     
     def _player_save_loop(self):
         """GPIO4: Guardar sección A-B como nuevo archivo"""
@@ -315,7 +301,6 @@ class PracticePlayer:
                 point_a=self.player.point_a,
                 point_b=self.player.point_b,
                 tempo=self.player.tempo_percent,
-                pitch=self.player.pitch_semitones,
                 help_text=help_text
             )
     
