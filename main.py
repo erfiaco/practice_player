@@ -199,13 +199,14 @@ class PracticePlayer:
         self._update_ui()
     
     def _player_save(self):
-        """
-        GPIO22: Tempo +1% o ajuste fino con delta variable
-        delta: segundos a ajustar (0.1, 0.5, o 1.0 según tiempo pulsado)
-        """
-        self.player.save_loop:
-            print(f"→ [ PLAYER] saving loop")
-        self._update_ui()   
+        """GPIO22: Guardar loop A-B"""
+        print("→ [PLAYER] Guardando loop")
+        success, message = self.player.save_loop()
+        if success:
+            print(f"✓ {message}")
+        else:
+            print(f"✗ {message}")
+        self._update_ui()
         
     # ========== UI ==========
     
